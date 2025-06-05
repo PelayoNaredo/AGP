@@ -1,0 +1,71 @@
+Para implementar un sistema de escaneo de productos y servicios con generación de tickets/facturas en tu aplicación de gestión de PYMEs, necesitarías realizar los siguientes pasos a grandes rasgos:
+
+Componentes del Frontend (React Native)
+Módulo de Escaneo y Selección:
+
+Implementar una pantalla para escanear códigos de barras/QR para productos físicos
+Interfaz para buscar productos/servicios manualmente (por nombre o código)
+Catálogo visual de servicios ofrecidos con descripción y precios
+Pantalla de Punto de Venta (POS):
+
+Listado combinado de productos y servicios seleccionados
+Cantidades para productos y horas/unidades para servicios
+Opciones para aplicar descuentos por tipo (producto/servicio) o al total
+Cálculo diferenciado de impuestos (si aplica distinto a productos y servicios)
+Gestión de Servicios:
+
+Selección de profesional/empleado que brinda el servicio
+Opciones de programación (fecha/hora) para servicios a entregar posteriormente
+Posibilidad de venta combinada (producto + servicio relacionado)
+Generación de Tickets/Facturas:
+
+Formulario para datos del cliente (opcional para tickets, obligatorio para facturas)
+Clasificación clara entre productos y servicios en el documento
+Opciones para compartir/imprimir (PDF, correo electrónico, impresora térmica)
+Historial y Seguimiento:
+
+Registro de ventas separando productos de servicios
+Seguimiento de servicios pendientes de entrega o programados
+Reportes diferenciados por tipo de venta
+Componentes del Backend (Node.js)
+Modelos de datos:
+
+Tabla unificada de ventas con tipo (producto/servicio/mixto)
+Tabla de detalles de venta con discriminación por tipo
+Relaciones con inventario, catálogo de servicios y profesionales
+Controladores:
+
+salesController.js - gestionar ventas combinadas
+serviceController.js - gestionar servicios y citas
+invoiceController.js - generación de documentos fiscales
+Rutas API:
+
+Endpoints para gestionar catálogo de servicios
+Endpoints para asignar profesionales a servicios
+Endpoints para programar servicios futuros
+Integración con recursos:
+
+Actualización de inventario para productos
+Gestión de disponibilidad de profesionales para servicios
+Calendario de servicios programados
+Sistema de facturación:
+
+Diferenciación clara entre productos y servicios (requerido en muchos países)
+Clasificación fiscal adecuada según normativa local
+Consideraciones técnicas
+Gestión dual producto/servicio:
+
+Interfaz adaptable que facilite ambos tipos de venta
+Flujos diferenciados según el tipo de ítem seleccionado
+Programación de servicios:
+
+Calendario integrado para gestión de citas
+Recordatorios para clientes y profesionales
+Impresión diferenciada:
+
+Tickets/facturas con formato adecuado para cada tipo
+Comprobantes de cita/reserva para servicios futuros
+Análisis de datos:
+
+Métricas separadas para rendimiento de productos vs servicios
+Informes de rentabilidad por tipo de venta

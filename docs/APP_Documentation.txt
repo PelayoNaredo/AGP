@@ -1,0 +1,124 @@
+-Folder Structure-
+
+AG-PYMEs/
+├── assets/                  # Archivos estáticos (imágenes, fuentes, etc.)
+│   ├── images/              # Imágenes utilizadas en la aplicación
+│   └── fonts/               # Fuentes personalizadas
+│
+├── components/              # Componentes reutilizables de la aplicación
+│   ├── Header.js            # Componente de la cabecera
+│   ├── Footer.js            # Componente del pie de página
+│   └── ...                  # Otros componentes
+│
+├── screens/                 # Pantallas de la aplicación
+│   ├── LoginScreen.js       # Pantalla de inicio de sesión
+│   ├── HomeScreen.js        # Pantalla de inicio con estadísticas
+│   ├── SettingsScreen.js    # Pantalla de ajustes
+│   ├── EmployeesScreen.js   # Pantalla de gestión de empleados
+│   ├── InventoryScreen.js   # Pantalla de gestión de inventarios
+│   ├── SalesScreen.js       # Pantalla de ventas
+│   └── ...                  # Otras pantallas
+│
+├── navigation/              # Configuración de la navegación
+│   ├── AppNavigator.js      # Navegación principal de la aplicación
+│   └── ...                  # Otras configuraciones de navegación
+│
+├── services/                # Servicios para interactuar con el backend
+│   ├── api.js               # Configuración de la API (axios, fetch, etc.)
+│   ├── auth.js              # Servicios de autenticación
+│   ├── employees.js         # Servicios para gestión de empleados
+│   ├── inventory.js         # Servicios para gestión de inventarios
+│   └── ...                  # Otros servicios
+│
+├── utils/                   # Utilidades y funciones auxiliares
+│   ├── constants.js         # Constantes globales (colores, rutas, etc.)
+│   ├── helpers.js           # Funciones de ayuda (formateo de fechas, etc.)
+│   └── ...                  # Otras utilidades
+│
+├── App.js                   # Punto de entrada de la aplicación
+├── app.json                 # Configuración de la aplicación
+└── package.json             # Dependencias y scripts del frontend
+
+backend/
+├── config/                  # Configuraciones del servidor
+│   ├── db.js                # Configuración de la base de datos
+│   ├── auth.js              # Configuración de autenticación (JWT, etc.)
+│   └── ...                  # Otras configuraciones
+│
+├── controllers/             # Controladores para manejar las rutas
+│   ├── authController.js    # Controlador para autenticación
+│   ├── employeeController.js # Controlador para gestión de empleados
+│   ├── inventoryController.js # Controlador para gestión de inventarios
+│   ├── salesController.js   # Controlador para gestión de ventas
+│   └── ...                  # Otros controladores
+│
+├── models/                  # Modelos de la base de datos
+│   ├── User.js              # Modelo de usuario
+│   ├── Employee.js          # Modelo de empleado
+│   ├── Inventory.js         # Modelo de inventario
+│   ├── Sale.js              # Modelo de venta
+│   └── ...                  # Otros modelos
+│
+├── routes/                  # Rutas de la API
+│   ├── authRoutes.js        # Rutas para autenticación
+│   ├── employeeRoutes.js    # Rutas para gestión de empleados
+│   ├── inventoryRoutes.js   # Rutas para gestión de inventarios
+│   ├── salesRoutes.js       # Rutas para gestión de ventas
+│   └── ...                  # Otras rutas
+│
+├── middleware/              # Middlewares personalizados
+│   ├── authMiddleware.js    # Middleware para autenticación
+│   ├── errorHandler.js      # Middleware para manejo de errores
+│   └── ...                  # Otros middlewares
+│
+├── services/                # Lógica de negocio
+│   ├── authService.js       # Servicios para autenticación
+│   ├── employeeService.js   # Servicios para gestión de empleados
+│   ├── inventoryService.js  # Servicios para gestión de inventarios
+│   ├── salesService.js      # Servicios para gestión de ventas
+│   └── ...                  # Otros servicios
+│
+├── utils/                   # Utilidades y funciones auxiliares
+│   ├── logger.js            # Utilidad para logging
+│   ├── emailSender.js       # Utilidad para enviar emails
+│   └── ...                  # Otras utilidades
+│
+├── .env                     # Variables de entorno (no subir a repositorio)
+├── server.js                # Punto de entrada del servidor
+└── package.json             # Dependencias y scripts del backend
+
+- documentation
+docs/                       # Documentación del proyecto
+├── README.md               # Documentación general del proyecto
+├── API_Documentation.md    # Documentación de la API
+├── APP_Documentation.txt    # Documentación de la Aplicación
+└── ...                     # Otras documentaciones
+
+tests/                      # Pruebas unitarias y de integración
+├── frontend/               # Pruebas del frontend
+│   ├── components/         # Pruebas de componentes
+│   └── screens/            # Pruebas de pantallas
+│
+├── backend/                # Pruebas del backend
+│   ├── controllers/        # Pruebas de controladores
+│   ├── services/           # Pruebas de servicios
+│   └── ...                 # Otras pruebas
+│
+└── ...                     # Otras pruebas
+
+scripts/                    # Scripts útiles para el proyecto
+├── deploy.sh               # Script para desplegar la aplicación
+└── ...                     # Otros scripts
+
+
+- Instalaciones Realizadas -
+
+Instalar Node.js LTS desde la pagina oficial de node
+Instalar expo en el fronted
+Escoger el template en blanco
+Insttalar las dependencias para react dom, screens, navigation y el safe area context
+Iniciar el proyecto con expo para prueba de correcta instalación
+Instalar PostgreSQL y pgAgent, configurar la base de datos incluyendo usuario en contraseña
+Crear dentro del proyecto la estructura de carpeta y los archivos a utilizar
+Configurar dentro de los archivos lo necesario para el funcionamiento correcto de las tecnologias a utilizar
+

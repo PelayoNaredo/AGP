@@ -1,0 +1,17 @@
+/* Fix posición inputs TimePicker en web */
+body [role="dialog"] [data-testid="time-picker-inputs"] {
+    display: flex !important;
+    gap: 20px !important;
+    margin-left: 40px !important;
+  }
+  
+  body [role="dialog"] [data-testid="time-picker-input"] {
+    width: 80px !important;
+    left: 0 !important;
+    transform: none !important;
+  }
+  
+  body [role="dialog"] [data-testid="time-picker-input"] input {
+    text-align: center !important;
+    padding: 8px !important;
+  }
