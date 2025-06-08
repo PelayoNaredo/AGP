@@ -1,4 +1,4 @@
-//Módulo principal para unificar todos los servicios mejorados
+//Módulo principal para unificar todos los servicios
 
 // Importar servicios rediseñados
 import { BaseStorage, TokenStorage, ImageStorage } from "./services/storage";
@@ -134,9 +134,6 @@ import { createUser } from "./services/usersService";
 
 // Importar componentes rediseñados
 import ImageWithAuth from "../components/ImageWithAuth";
-
-// Importar utilidades de plataforma
-import Platform from "../utils/platform";
 
 //API unificada para todos los servicios
 const Services = {
@@ -317,17 +314,6 @@ const Services = {
     getFilenameFromUrl:
       FileService.getFilenameFromUrl || FileService.getFilename || null,
   },
-
-  //Utilidades específicas de plataforma
-  Platform,
-
-  //Información sobre el entorno actual
-  Environment: {
-    isWeb: Platform.isWeb,
-    isMobile: Platform.isMobile,
-    isIOS: Platform.isIOS,
-    isAndroid: Platform.isAndroid,
-  },
 };
 
 //Componentes
@@ -483,9 +469,6 @@ export {
 
   // Componentes
   ImageWithAuth,
-
-  // Plataforma
-  Platform,
 };
 
 // Exportación por defecto

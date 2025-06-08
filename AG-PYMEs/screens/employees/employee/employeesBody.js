@@ -5,12 +5,13 @@ import {
   Text,
   ScrollView,
   ActivityIndicator,
-  Alert,
   Platform,
   Modal,
   Pressable,
 } from "react-native";
 import { useTheme } from "../../../context/ThemeContext";
+import { NotificationProvider } from "../../../context/NotificationContext";
+import useNotifications from "../../../hooks/useNotifications";
 import CustomButton from "../../../components/customButton";
 import CustomPicker from "../../../components/customPicker";
 import SearchHeaderBar from "../../../components/searchHeaderBar";
@@ -23,6 +24,8 @@ import { Ionicons } from "@expo/vector-icons";
 // Este componente incluye la barra de búsqueda, los filtros y la lista de empleados
 const EmployeesBody = ({ onEmployeeUpdate }) => {
   const { themeObject } = useTheme();
+  const { showSuccess, showError, showInfo, showConfirmDialog } =
+    useNotifications();
   const [employees, setEmployees] = useState([]);
   const [filteredEmployees, setFilteredEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +52,7 @@ const EmployeesBody = ({ onEmployeeUpdate }) => {
     } catch (err) {
       console.error("Error cargando empleados:", err);
       setError(err.message);
+      showError("Error", `No se pudieron cargar los empleados: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -118,11 +122,11 @@ const EmployeesBody = ({ onEmployeeUpdate }) => {
       if (onEmployeeUpdate) {
         onEmployeeUpdate();
       }
-
       handleModalClose();
+      showSuccess("Empleado creado correctamente");
     } catch (error) {
       console.error("Error creando empleado:", error);
-      Alert.alert("Error", "No se pudo crear el empleado");
+      showError("Error", "No se pudo crear el empleado");
     } finally {
       setLoading(false);
     }
@@ -148,33 +152,42 @@ const EmployeesBody = ({ onEmployeeUpdate }) => {
       if (onEmployeeUpdate) {
         onEmployeeUpdate();
       }
-
       handleModalClose();
+      showSuccess("Empleado actualizado correctamente");
     } catch (error) {
       console.error("Error actualizando empleado:", error);
-      Alert.alert("Error", "No se pudo actualizar el empleado");
+      showError("Error", "No se pudo actualizar el empleado");
     } finally {
       setLoading(false);
     }
   };
-  const handleDelete = async (id) => {
-    try {
-      setLoading(true);
-      await Services.Data.Employees.delete(id);
+  const handleDelete = (id) => {
+    // Confirmar antes de eliminar
+    showConfirmDialog(
+      "Eliminar empleado",
+      "¿Está seguro de que desea eliminar este empleado? Esta acción no se puede deshacer.",
+      async () => {
+        try {
+          setLoading(true);
+          await Services.Data.Employees.delete(id);
 
-      // Actualizar estado local
-      setEmployees((prev) => prev.filter((emp) => emp.id_empleado !== id));
+          // Actualizar estado local
+          setEmployees((prev) => prev.filter((emp) => emp.id_empleado !== id));
 
-      // Notificar al padre
-      if (onEmployeeUpdate) {
-        onEmployeeUpdate();
+          // Notificar al padre
+          if (onEmployeeUpdate) {
+            onEmployeeUpdate();
+          }
+
+          showSuccess("Empleado eliminado correctamente");
+        } catch (error) {
+          console.error("Error eliminando empleado:", error);
+          showError("Error", "No se pudo eliminar el empleado");
+        } finally {
+          setLoading(false);
+        }
       }
-    } catch (error) {
-      console.error("Error eliminando empleado:", error);
-      Alert.alert("Error", "No se pudo eliminar el empleado");
-    } finally {
-      setLoading(false);
-    }
+    );
   };
 
   const handleModalSubmit = async (formData) => {
@@ -474,17 +487,19 @@ const EmployeesBody = ({ onEmployeeUpdate }) => {
               : "No se encontraron empleados con los filtros seleccionados"}
           </Text>
         ) : (
-          filteredEmployees.map((employee) => (
-            <EmployeeCard
-              key={employee.id_empleado}
-              employee={employee}
-              onEdit={() => {
-                setSelectedEmployee(employee);
-                setIsModalVisible(true);
-              }}
-              onDelete={() => handleDelete(employee.id_empleado)}
-            />
-          ))
+          <NotificationProvider>
+            {filteredEmployees.map((employee) => (
+              <EmployeeCard
+                key={employee.id_empleado}
+                employee={employee}
+                onEdit={() => {
+                  setSelectedEmployee(employee);
+                  setIsModalVisible(true);
+                }}
+                onDelete={() => handleDelete(employee.id_empleado)}
+              />
+            ))}
+          </NotificationProvider>
         )}
       </ScrollView>
       <EmployeeModal

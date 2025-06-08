@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   getAllEmployees,
-  getEmployeeById,
+  // getEmployeeById, // CÓDIGO MUERTO: No se usa en este hook
   updateEmployee,
   createEmployee,
   deleteEmployee,
@@ -9,8 +9,8 @@ import {
 import {
   getLeaves,
   createLeave,
-  updateLeave,
-  deleteLeave,
+  // updateLeave, // CÓDIGO MUERTO: No se usa en este hook
+  // deleteLeave, // CÓDIGO MUERTO: No se usa en este hook
 } from "../../api/services/leavesService";
 
 const useEmployeeManagement = () => {

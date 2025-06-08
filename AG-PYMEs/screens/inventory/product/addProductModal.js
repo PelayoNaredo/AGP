@@ -14,11 +14,13 @@ import ModalTemplate from "../../../components/modalTemplate";
 import { Ionicons } from "@expo/vector-icons";
 import { Services } from "../../../api/index";
 import BarcodeScanner from "../../../components/BarcodeScanner";
+import useNotifications from "../../../hooks/useNotifications";
 
 // Componente AddProductModal para crear o editar productos en el inventario
 const AddProductModal = ({ visible, onClose, product, onCreateSuccess }) => {
   const { themeObject } = useTheme();
   const styles = createStyles(themeObject);
+  const { showError } = useNotifications();
 
   const [formData, setFormData] = useState({
     nombre_producto: "",
@@ -173,18 +175,17 @@ const AddProductModal = ({ visible, onClose, product, onCreateSuccess }) => {
         precio_unitario: parseFloat(formData.precio_unitario),
         id_proveedor: formData.id_proveedor || null,
         pvp: formData.pvp ? parseFloat(formData.pvp) : null,
-      };
-      // Si el producto ya existe, actualizamos, si no, creamos uno nuevo
+      }; // Si el producto ya existe, actualizamos, si no, creamos uno nuevo
       if (product) {
         await Services.Data.Inventory.update(product.id_producto, productData);
       } else {
         await Services.Data.Inventory.create(productData);
       }
 
-      onCreateSuccess();
+      onCreateSuccess(!!product); // Pasamos true si es una edición, false si es creación
       onClose();
     } catch (error) {
-      Alert.alert(
+      showError(
         "Error",
         `No se pudo ${product ? "actualizar" : "crear"} el producto: ${error.message}`
       );

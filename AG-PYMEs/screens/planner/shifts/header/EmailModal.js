@@ -3,6 +3,7 @@ import { View, Text } from "react-native";
 import { Dialog, Button, Checkbox } from "react-native-paper";
 import { Services } from "../../../../api/index";
 import { sendEmail } from "../../../inventory/order/EmailOrderSender";
+import useNotifications from "../../../../hooks/useNotifications";
 
 // Función para obtener el primer día del mes
 const getFirstDayOfMonth = (date) => {
@@ -25,12 +26,6 @@ const getLastDayOfMonth = (date) => {
 const formatMonthYear = (date) => {
   const options = { month: "long", year: "numeric" };
   return date.toLocaleDateString("es-ES", options);
-};
-
-// Función para formatear una fecha en formato legible
-const formatReadableDate = (date) => {
-  const options = { year: "numeric", month: "long", day: "numeric" };
-  return new Date(date).toLocaleDateString("es-ES", options);
 };
 
 // Función para formatear la hora en formato 12 horas (AM/PM)
@@ -71,6 +66,8 @@ const EmailModal = ({ visible, onDismiss, selectedDate, themeObject }) => {
   const [selectionModalVisible, setSelectionModalVisible] = useState(false);
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [allEmployees, setAllEmployees] = useState([]);
+  const { showSuccess, showError } = useNotifications();
+
   // Función para preparar el modal de selección de empleados
   const openEmployeeSelectionModal = async () => {
     onDismiss();
@@ -86,7 +83,7 @@ const EmailModal = ({ visible, onDismiss, selectedDate, themeObject }) => {
         await Services.Data.Shifts.getMonthlyShiftsForExport(monthStart);
 
       if (!shiftsWithEmployeeInfo || shiftsWithEmployeeInfo.length === 0) {
-        alert("No hay horarios para enviar en este mes");
+        showError("Error", "No hay horarios para enviar en este mes");
         setLoading(false);
         return;
       }
@@ -106,7 +103,10 @@ const EmailModal = ({ visible, onDismiss, selectedDate, themeObject }) => {
       setSelectionModalVisible(true);
     } catch (error) {
       console.error("Error al cargar empleados:", error);
-      alert("No se pudieron cargar los empleados para el envío de correos.");
+      showError(
+        "Error",
+        "No se pudieron cargar los empleados para el envío de correos."
+      );
     } finally {
       setLoading(false);
     }
@@ -118,14 +118,12 @@ const EmailModal = ({ visible, onDismiss, selectedDate, themeObject }) => {
     try {
       // Calcular fecha inicio mes
       const firstDayOfMonth = getFirstDayOfMonth(selectedDate);
-      const monthStart = firstDayOfMonth.toISOString().split("T")[0];
-
-      // Usar el servicio para obtener los datos con horarios predeterminados e información de empleados
+      const monthStart = firstDayOfMonth.toISOString().split("T")[0]; // Usar el servicio para obtener los datos con horarios predeterminados e información de empleados
       const shiftsWithEmployeeInfo =
         await Services.Data.Shifts.getMonthlyShiftsForExport(monthStart);
 
       if (!shiftsWithEmployeeInfo || shiftsWithEmployeeInfo.length === 0) {
-        alert("No hay horarios para enviar en este mes");
+        showError("Error", "No hay horarios para enviar en este mes");
         setLoading(false);
         return;
       }
@@ -155,9 +153,7 @@ const EmailModal = ({ visible, onDismiss, selectedDate, themeObject }) => {
           shift.employee &&
           shift.employee.email &&
           selectedEmployees.includes(shift.id_empleado)
-      );
-
-      // Para cada empleado con horario seleccionado, enviar un correo
+      ); // Para cada empleado con horario seleccionado, enviar un correo
       for (const shift of filteredShifts) {
         if (!shift.employee || !shift.employee.email) {
           emailsFailed++;
@@ -187,9 +183,18 @@ const EmailModal = ({ visible, onDismiss, selectedDate, themeObject }) => {
           emailsFailed++;
         }
       }
+
+      // Mostrar resumen de correos enviados
+      if (emailsSent > 0) {
+        showSuccess(
+          `Se enviaron ${emailsSent} correos correctamente${emailsFailed > 0 ? ` (${emailsFailed} fallidos)` : ""}`
+        );
+      } else if (emailsFailed > 0) {
+        showError("Error", `No se pudieron enviar ${emailsFailed} correos`);
+      }
     } catch (error) {
       console.error("Error al enviar los horarios por correo:", error);
-      alert("No se pudieron enviar los horarios por correo.");
+      showError("Error", "No se pudieron enviar los horarios por correo.");
     } finally {
       setLoading(false);
     }
@@ -324,14 +329,6 @@ const EmailModal = ({ visible, onDismiss, selectedDate, themeObject }) => {
 
     return "No hay horarios disponibles para añadir al calendario.";
   };
-
-  // Función para normalizar el formato del día de la semana
-  const normalizeDayOfWeek = (dayValue) => {
-    if (dayValue === undefined || dayValue === null) return null;
-    // Convertir a número si viene como string
-    return typeof dayValue === "string" ? parseInt(dayValue, 10) : dayValue;
-  };
-
   // Función para transformar los intervalos como lo hace ShiftManagerContainer
   const transformIntervals = (shift, dayNumber) => {
     if (!shift || !shift.intervals || !Array.isArray(shift.intervals)) {
@@ -349,52 +346,6 @@ const EmailModal = ({ visible, onDismiss, selectedDate, themeObject }) => {
     });
 
     return intervalosDia;
-  };
-
-  // Función mejorada para obtener intervalos de un día específico
-  const getIntervalsForDay = (shift, dayNumber) => {
-    // Validar parámetros de entrada
-    if (!shift) {
-      console.error("El objeto shift es null o undefined");
-      return [];
-    }
-
-    // Manejar tanto arrays como objetos para intervalos (compatibilidad con diferentes formatos)
-    let intervals = [];
-
-    // Caso 1: el shift tiene una propiedad 'intervals' que es un array
-    if (shift.intervals && Array.isArray(shift.intervals)) {
-      intervals = shift.intervals;
-    }
-    // Caso 2: el shift tiene propiedades numeradas [1-7] con horarios, como en ShiftManagerContainer
-    else if (shift[dayNumber]) {
-      const dayData = shift[dayNumber];
-      if (dayData.intervalos && Array.isArray(dayData.intervalos)) {
-        // Adaptar el formato de los intervalos
-        return dayData.intervalos.map((interval) => ({
-          dia_semana: dayNumber,
-          hora_entrada: interval.hora_inicio || interval.hora_entrada, // Manejar ambos formatos
-          hora_salida: interval.hora_fin || interval.hora_salida, // Manejar ambos formatos
-        }));
-      }
-    }
-
-    // Filtrar intervalos para el día especificado
-    const dayNum = parseInt(dayNumber, 10);
-    return intervals.filter((interval) => {
-      if (!interval || interval.dia_semana === undefined) return false;
-
-      // Convertir dia_semana a número si es un string
-      const diaSemana =
-        typeof interval.dia_semana === "string"
-          ? parseInt(interval.dia_semana, 10)
-          : interval.dia_semana;
-
-      // Validar que sea un número válido
-      if (isNaN(diaSemana)) return false;
-
-      return diaSemana === dayNum;
-    });
   };
 
   return (

@@ -113,9 +113,13 @@ const TableBody = ({
         color={themeObject.colors.primary}
       />
       <View style={styles.scheduleIntervals}>
+        {" "}
         {shifts[empleado.id_empleado]?.[dia]?.intervalos.map(
           (intervalo, index) => (
-            <Text key={index} style={styles.scheduleText}>
+            <Text
+              key={`schedule-${empleado.id_empleado}-${dia}-${intervalo.hora_inicio}-${intervalo.hora_fin}-${index}`}
+              style={styles.scheduleText}
+            >
               {formatTime(intervalo.hora_inicio)} -{" "}
               {formatTime(intervalo.hora_fin)}
             </Text>
@@ -220,9 +224,13 @@ const TableBody = ({
               onPress={() => onEditShift(empleado, diaIndex)}
               disabled={!empleado.activo}
             >
+              {" "}
               <View style={styles.intervalsContainer}>
                 {intervalos.map((intervalo, idx) => (
-                  <View key={idx} style={styles.intervalRow}>
+                  <View
+                    key={`${empleado.id_empleado}-${dia}-interval-${intervalo.hora_inicio}-${intervalo.hora_fin}-${idx}`}
+                    style={styles.intervalRow}
+                  >
                     <Text style={styles.shiftTime}>
                       {formatTime(intervalo.hora_inicio)}
                     </Text>
@@ -276,10 +284,14 @@ const TableBody = ({
           overScrollMode="always"
           keyboardShouldPersistTaps="handled"
         >
+          {" "}
           <View style={[styles.timelineContainer, { width: businessWidth }]}>
             {renderTimelineBar(empleado.id_empleado)}
             {timeSlots.map((slot, index) => (
-              <View key={index} style={styles.timeSlot} />
+              <View
+                key={`timeslot-${empleado.id_empleado}-${slot}-${index}`}
+                style={styles.timeSlot}
+              />
             ))}
           </View>
         </ScrollView>

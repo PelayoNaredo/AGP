@@ -5,6 +5,7 @@ import ModalTemplate from "../../../components/modalTemplate";
 import CustomButton from "../../../components/customButton";
 import CustomPicker from "../../../components/customPicker";
 import { useTheme } from "../../../context/ThemeContext";
+import useNotifications from "../../../hooks/useNotifications";
 
 // Componente LeaveModal para registrar o editar bajas de empleados
 const LeaveModal = ({
@@ -16,6 +17,7 @@ const LeaveModal = ({
   leaveToEdit,
 }) => {
   const { themeObject } = useTheme();
+  const { showError, showSuccess, showInfo } = useNotifications();
   const styles = createStyles(themeObject);
 
   const [formData, setFormData] = useState({
@@ -58,11 +60,10 @@ const LeaveModal = ({
       });
     }
   }, [leaveToEdit, employees]);
-
   // Manejar el envío del formulario y validar que todos los campos obligatorios estén completos
   const handleSubmit = () => {
     if (!isFormValid()) {
-      Alert.alert("Error", "Por favor, complete todos los campos obligatorios");
+      showError("Error", "Por favor, complete todos los campos obligatorios");
       return;
     }
 
@@ -125,7 +126,10 @@ const LeaveModal = ({
       cancelLabel="Cancelar"
       cancelAction={onClose}
       confirmLabel={leaveToEdit ? "Actualizar" : "Registrar"}
-      confirmAction={handleSubmit}
+      confirmAction={() => {
+        handleSubmit();
+        // No mostramos notificación aquí porque se hará en el componente padre después de que la operación se complete con éxito
+      }}
       confirmDisabled={!isFormValid() || loading}
     >
       <View style={styles.inputContainer}>

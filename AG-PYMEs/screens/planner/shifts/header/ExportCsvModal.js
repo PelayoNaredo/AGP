@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Text, Platform } from "react-native";
 import { Dialog, Button } from "react-native-paper";
 import { Services } from "../../../../api/index";
+import useNotifications from "../../../../hooks/useNotifications";
 
 // Función para obtener el primer día del mes
 const getFirstDayOfMonth = (date) => {
@@ -41,18 +42,12 @@ const getDayName = (dayNumber) => {
   return days[dayNumber === 7 ? 0 : dayNumber];
 };
 
-// Función para normalizar el formato del día de la semana
-const normalizeDayOfWeek = (dayValue) => {
-  if (dayValue === undefined || dayValue === null) return null;
-  // Convertir a número si viene como string
-  return typeof dayValue === "string" ? parseInt(dayValue, 10) : dayValue;
-};
-
 /**
  * Componente para el modal de exportación de horarios a CSV
  */
 const ExportCsvModal = ({ visible, onDismiss, selectedDate, themeObject }) => {
   const [loading, setLoading] = useState(false);
+  const { showSuccess, showError } = useNotifications();
 
   // Función para exportar horarios a CSV
   const exportShiftsToCsv = async () => {
@@ -69,9 +64,8 @@ const ExportCsvModal = ({ visible, onDismiss, selectedDate, themeObject }) => {
       // Usar la nueva función específica para exportación de horarios mensuales
       const shiftsWithEmployeeInfo =
         await Services.Data.Shifts.getMonthlyShiftsForExport(monthStart);
-
       if (!shiftsWithEmployeeInfo || shiftsWithEmployeeInfo.length === 0) {
-        alert("No hay horarios para exportar en este mes");
+        showError("Error", "No hay horarios para exportar en este mes");
         setLoading(false);
         return;
       } // Verificar que cada turno tenga intervalos
@@ -138,13 +132,15 @@ const ExportCsvModal = ({ visible, onDismiss, selectedDate, themeObject }) => {
 
       // Descargar el archivo
       if (Platform.OS === "web") {
-        // En web, crear un enlace y simulamos un clic para descargar
-        const a = document.createElement("a");
+        // En web, crear un enlace y simulamos un clic para descargar        const a = document.createElement("a");
         a.href = url;
         a.download = fileName;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+
+        // Mostrar mensaje de éxito
+        showSuccess("Horarios exportados correctamente");
       } else {
         // En móvil, usar FileSystem de expo-file-system
         try {
@@ -152,9 +148,7 @@ const ExportCsvModal = ({ visible, onDismiss, selectedDate, themeObject }) => {
           const FileSystem = require("expo-file-system");
 
           const fileUri = FileSystem.cacheDirectory + fileName;
-          await FileSystem.writeAsStringAsync(fileUri, csvContent);
-
-          // Compartir el archivo
+          await FileSystem.writeAsStringAsync(fileUri, csvContent); // Compartir el archivo
           const shareResult = await FileSystem.shareAsync(fileUri, {
             mimeType: "text/csv",
             dialogTitle: "Exportar horarios",
@@ -162,38 +156,22 @@ const ExportCsvModal = ({ visible, onDismiss, selectedDate, themeObject }) => {
           });
 
           if (!shareResult.action) {
-            alert("Horarios exportados correctamente");
+            showSuccess("Horarios exportados correctamente");
           }
         } catch (fsError) {
           console.error("Error al usar FileSystem:", fsError);
-          alert("No se pudo exportar el archivo CSV en este dispositivo");
+          showError(
+            "Error",
+            "No se pudo exportar el archivo CSV en este dispositivo"
+          );
         }
       }
     } catch (error) {
       console.error("Error al exportar los horarios:", error);
-      alert("Hubo un error al exportar los horarios");
+      showError("Error", "Hubo un error al exportar los horarios");
     } finally {
       setLoading(false);
     }
-  };
-
-  // Función para transformar los intervalos como lo hace ShiftManagerContainer
-  const transformIntervals = (shift, dayNumber) => {
-    if (!shift || !shift.intervals || !Array.isArray(shift.intervals)) {
-      return [];
-    }
-
-    // Convertir dayNumber a número para asegurar comparación correcta
-    const dayNum = parseInt(dayNumber, 10);
-
-    // Implementar la misma lógica que en ShiftManagerContainer
-    const intervalosDia = shift.intervals.filter((interval) => {
-      // Asegurar que dia_semana sea un número (puede venir como string)
-      const diaSemana = parseInt(interval.dia_semana, 10);
-      return diaSemana === dayNum;
-    });
-
-    return intervalosDia;
   };
 
   // Función mejorada para obtener intervalos de un día específico

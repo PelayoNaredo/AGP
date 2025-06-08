@@ -217,6 +217,4 @@ const BluetoothPrinterManager = ({ onPrinterStatusChange }) => {
   );
 };
 
-// Modificamos esta exportación para evitar conflictos con las importaciones circulares
-export { BluetoothPrinterManager };
 export default BluetoothPrinterManager;

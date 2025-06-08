@@ -5,10 +5,10 @@ import {
   TextInput,
   ScrollView,
   StyleSheet,
-  Alert,
   ActivityIndicator,
 } from "react-native";
 import { useTheme } from "../../../context/ThemeContext";
+import useNotifications from "../../../hooks/useNotifications";
 import CustomButton from "../../../components/customButton";
 import CustomPicker from "../../../components/customPicker";
 import ModalTemplate from "../../../components/modalTemplate";
@@ -33,6 +33,7 @@ const OrderModal = ({
 }) => {
   const { themeObject } = useTheme();
   const styles = createStyles(themeObject);
+  const { showError } = useNotifications();
 
   const [formData, setFormData] = useState({
     id_proveedor: "",
@@ -130,7 +131,6 @@ const OrderModal = ({
       return false;
     }
   };
-
   // Manejar el envío del formulario
   const handleSubmit = async () => {
     try {
@@ -140,7 +140,7 @@ const OrderModal = ({
         formData.items.length === 0 ||
         !formData.estado
       ) {
-        Alert.alert("Error", "Complete los campos requeridos (*)");
+        showError("Error", "Complete los campos requeridos (*)");
         return;
       }
 
@@ -150,7 +150,7 @@ const OrderModal = ({
       );
 
       if (hasInvalidItems) {
-        Alert.alert("Error", "Revise los productos seleccionados");
+        showError("Error", "Revise los productos seleccionados");
         return;
       }
 
@@ -200,7 +200,7 @@ const OrderModal = ({
       onSuccess(savedOrder);
       onClose();
     } catch (error) {
-      Alert.alert("Error", "No se pudo guardar el pedido");
+      showError("Error", "No se pudo guardar el pedido");
     }
   };
 
@@ -332,33 +332,6 @@ const OrderModal = ({
           onToggle={(value) => setSendEmailToSupplier(value)}
           supplier={selectedSupplier}
         />
-
-        {order && (
-          <CustomButton
-            onPress={() => {
-              Alert.alert("Confirmar", "¿Deseas eliminar este pedido?", [
-                { text: "Cancelar", style: "cancel" },
-                {
-                  text: "Eliminar",
-                  style: "destructive",
-                  onPress: async () => {
-                    try {
-                      await Services.Data.Orders.delete(order.id_pedido);
-                      onSuccess(null);
-                      onClose();
-                    } catch (err) {
-                      Alert.alert("Error", "No se pudo eliminar el pedido");
-                    }
-                  },
-                },
-              ]);
-            }}
-            variant="error"
-            style={styles.deleteButton}
-          >
-            Eliminar Pedido
-          </CustomButton>
-        )}
       </ScrollView>
     </ModalTemplate>
   );
@@ -392,9 +365,6 @@ const createStyles = (theme) =>
       justifyContent: "flex-start",
       backgroundColor: theme.colors.background,
       borderColor: theme.colors.border,
-    },
-    deleteButton: {
-      marginTop: 24,
     },
   });
 

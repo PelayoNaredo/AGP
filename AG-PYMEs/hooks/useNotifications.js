@@ -1,53 +1,23 @@
-import { useState, useCallback } from "react";
-import { Alert } from "react-native";
+import { useCallback } from "react";
+import { useNotification as useGlobalNotification } from "../context/NotificationContext";
 
-/**
- * Hook personalizado para gestionar notificaciones y mensajes al usuario
- * @returns {Object} - Funciones para mostrar distintos tipos de notificaciones
- */
+//Hook personalizado para gestionar notificaciones y mensajes al usuario
 const useNotifications = () => {
-  const [snackbarVisible, setSnackbarVisible] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState("");
-  const [snackbarType, setSnackbarType] = useState("info"); // info, success, error, warning
-
-  /**
-   * Muestra un mensaje en el snackbar
-   * @param {string} message - Mensaje a mostrar
-   * @param {string} type - Tipo de mensaje (info, success, error, warning)
-   * @param {number} duration - Duración del mensaje en milisegundos
-   */
+  const notification = useGlobalNotification();
+  //Muestra un mensaje en el snackbar
   const showSnackbar = useCallback(
     (message, type = "info", duration = 3000) => {
-      setSnackbarMessage(message);
-      setSnackbarType(type);
-      setSnackbarVisible(true);
-
-      // Auto-ocultar después de la duración especificada
-      if (duration > 0) {
-        setTimeout(() => {
-          setSnackbarVisible(false);
-        }, duration);
-      }
+      notification.showNotification(message, { type, duration });
     },
-    []
+    [notification]
   );
 
-  /**
-   * Oculta el snackbar
-   */
+  //Oculta el snackbar
   const hideSnackbar = useCallback(() => {
-    setSnackbarVisible(false);
-  }, []);
+    notification.hideNotification();
+  }, [notification]);
 
-  /**
-   * Muestra una alerta de confirmación
-   * @param {string} title - Título de la alerta
-   * @param {string} message - Mensaje de la alerta
-   * @param {Function} onConfirm - Función a ejecutar al confirmar
-   * @param {Function} onCancel - Función a ejecutar al cancelar
-   * @param {string} confirmText - Texto del botón de confirmación
-   * @param {string} cancelText - Texto del botón de cancelación
-   */
+  //Muestra una alerta de confirmación
   const showConfirmDialog = useCallback(
     (
       title,
@@ -57,70 +27,57 @@ const useNotifications = () => {
       confirmText = "Confirmar",
       cancelText = "Cancelar"
     ) => {
-      Alert.alert(
-        title,
-        message,
-        [
-          {
-            text: cancelText,
-            onPress: onCancel,
-            style: "cancel",
-          },
-          {
-            text: confirmText,
-            onPress: onConfirm,
-          },
-        ],
-        { cancelable: false }
+      // Ahora usamos el nuevo sistema de notificaciones con soporte para confirmar/cancelar
+      notification.showConfirmDeny(
+        `${title}: ${message}`,
+        onConfirm,
+        onCancel,
+        {
+          confirmText,
+          cancelText,
+        }
       );
     },
-    []
+    [notification]
   );
 
-  /**
-   * Muestra un mensaje de error
-   * @param {string} title - Título del error
-   * @param {string} message - Mensaje del error
-   * @param {Function} onPress - Función a ejecutar al presionar OK
-   */
-  const showError = useCallback((title, message, onPress = () => {}) => {
-    Alert.alert(title, message, [{ text: "OK", onPress }], {
-      cancelable: false,
-    });
-  }, []);
+  //Muestra un mensaje de error
+  const showError = useCallback(
+    (title, message, onPress = () => {}) => {
+      notification.showError(`${title}: ${message}`);
+      // No es posible manejar el onPress con el sistema actual de notificaciones
+    },
+    [notification]
+  );
 
-  /**
-   * Muestra una notificación de éxito
-   * @param {string} message - Mensaje de éxito
-   */
+  //Muestra una notificación de éxito
   const showSuccess = useCallback(
     (message) => {
-      showSnackbar(message, "success");
+      notification.showSuccess(message);
     },
-    [showSnackbar]
+    [notification]
   );
 
-  /**
-   * Muestra una notificación de error
-   * @param {string} message - Mensaje de error
-   */
+  //Muestra una notificación de error
   const showErrorNotification = useCallback(
     (message) => {
-      showSnackbar(message, "error");
+      notification.showError(message);
     },
-    [showSnackbar]
+    [notification]
   );
 
   return {
-    snackbarVisible,
-    snackbarMessage,
-    snackbarType,
     showSnackbar,
     hideSnackbar,
     showConfirmDialog,
     showError,
     showSuccess,
     showErrorNotification,
+
+    // Nuevos métodos del sistema global
+    showWarning: notification.showWarning,
+    showPersistent: notification.showPersistent,
+    showConfirmDeny: notification.showConfirmDeny,
   };
 };
 

@@ -8,6 +8,7 @@ import Animated, {
   Easing,
 } from "react-native-reanimated";
 import { useTheme } from "../context/ThemeContext";
+import { hexToRgb } from "../utils/helpers";
 
 const AlertBox = ({
   message,
@@ -52,17 +53,9 @@ const AlertBox = ({
   };
   // Asegurar que siempre tengamos una configuración válida, incluso para tipos desconocidos
   const { name: iconName, color: iconColor } =
-    iconConfig[type] || iconConfig.info;
-  // Obtener el fondo con opacidad basado en el color del icono
+    iconConfig[type] || iconConfig.info; // Obtener el fondo con opacidad basado en el color del icono
   const getBgColor = () => {
-    const hexToRgba = (hex, alpha) => {
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    };
-
-    return hexToRgba(iconColor, 0.12); // Fondo muy sutil
+    return `rgba(${hexToRgb(iconColor)}, 0.12)`; // Fondo muy sutil
   };
   // Función para obtener el estilo de la barra de prioridad
   const getPriorityStyle = () => {

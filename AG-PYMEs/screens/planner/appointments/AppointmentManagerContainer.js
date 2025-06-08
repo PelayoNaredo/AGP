@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Services } from "../../../api/index";
+import useNotifications from "../../../hooks/useNotifications";
 
 // Maneja la lógica de la pantalla de gestión de citas
 const AppointmentManagerContainer = ({ children }) => {
@@ -11,6 +12,7 @@ const AppointmentManagerContainer = ({ children }) => {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { showError, showSuccess, showInfo } = useNotifications();
 
   // Formatear fecha a YYYY-MM-DD
   function formatPostgresDate(date) {
@@ -119,9 +121,7 @@ const AppointmentManagerContainer = ({ children }) => {
             setClients(results[3].value);
           } else {
             console.warn("Error al cargar clientes:", results[3].reason);
-          }
-
-          // Verificar si hubo algún error en las respuestas
+          } // Verificar si hubo algún error en las respuestas
           const errors = results
             .filter((r) => r.status === "rejected")
             .map((r) => r.reason?.message || "Error desconocido");
@@ -129,26 +129,31 @@ const AppointmentManagerContainer = ({ children }) => {
             console.warn("Errores detectados:", errors);
             // Mostramos el error solo si fallan todos los servicios importantes
             if (errors.length >= 2) {
-              setError(
-                "Algunos datos no pudieron cargarse correctamente. La funcionalidad puede estar limitada."
-              );
+              const errorMsg =
+                "Algunos datos no pudieron cargarse correctamente. La funcionalidad puede estar limitada.";
+              setError(errorMsg);
+              showError("Error de carga", errorMsg);
             }
           }
         } catch (apiError) {
           console.error("Error en las llamadas API:", apiError);
-          setError("Error de comunicación con el servidor.");
+          const errorMsg = "Error de comunicación con el servidor.";
+          setError(errorMsg);
+          showError("Error de comunicación", errorMsg);
         }
       } catch (err) {
         console.error("Error general cargando datos de citas:", err);
-        setError("Error al cargar los datos. La vista puede estar incompleta.");
+        const errorMsg =
+          "Error al cargar los datos. La vista puede estar incompleta.";
+        setError(errorMsg);
+        showError("Error", errorMsg);
       } finally {
         setLoading(false);
       }
     };
 
     loadData();
-  }, [selectedDate, selectedView]);
-  // Crear una nueva cita
+  }, [selectedDate, selectedView]); // Crear una nueva cita
   const handleCreateAppointment = async (appointmentData) => {
     try {
       setLoading(true);
@@ -165,16 +170,19 @@ const AppointmentManagerContainer = ({ children }) => {
       // Actualizar las citas locales
       setAppointments((prev) => [...prev, result]);
 
+      // Mostrar notificación de éxito
+      showSuccess("Cita creada correctamente");
+
       return result;
     } catch (err) {
       console.error("Error creando cita:", err);
       setError(err.message);
+      showError("Error", `No se pudo crear la cita: ${err.message}`);
       throw err;
     } finally {
       setLoading(false);
     }
-  };
-  // Actualizar una cita existente
+  }; // Actualizar una cita existente
   const handleUpdateAppointment = async (id, appointmentData) => {
     try {
       setLoading(true);
@@ -195,16 +203,19 @@ const AppointmentManagerContainer = ({ children }) => {
         )
       );
 
+      // Mostrar notificación de éxito
+      showSuccess("Cita actualizada correctamente");
+
       return result;
     } catch (err) {
       console.error("Error actualizando cita:", err);
       setError(err.message);
+      showError("Error", `No se pudo actualizar la cita: ${err.message}`);
       throw err;
     } finally {
       setLoading(false);
     }
   };
-
   // Actualizar el estado de una cita
   const handleUpdateAppointmentStatus = async (id, status) => {
     try {
@@ -218,16 +229,28 @@ const AppointmentManagerContainer = ({ children }) => {
         )
       );
 
+      // Mostrar notificación según el estado
+      if (status === "completada") {
+        showSuccess("Cita marcada como completada");
+      } else if (status === "cancelada") {
+        showInfo("Cita cancelada");
+      } else {
+        showSuccess(`Estado de la cita actualizado: ${status}`);
+      }
+
       return result;
     } catch (err) {
       console.error("Error actualizando estado de cita:", err);
       setError(err.message);
+      showError(
+        "Error",
+        `No se pudo actualizar el estado de la cita: ${err.message}`
+      );
       throw err;
     } finally {
       setLoading(false);
     }
   };
-
   // Eliminar una cita
   const handleDeleteAppointment = async (id) => {
     try {
@@ -239,10 +262,14 @@ const AppointmentManagerContainer = ({ children }) => {
         prev.filter((appointment) => appointment.id_cita !== id)
       );
 
+      // Mostrar notificación de éxito
+      showSuccess("Cita eliminada correctamente");
+
       return true;
     } catch (err) {
       console.error("Error eliminando cita:", err);
       setError(err.message);
+      showError("Error", `No se pudo eliminar la cita: ${err.message}`);
       throw err;
     } finally {
       setLoading(false);
@@ -255,7 +282,9 @@ const AppointmentManagerContainer = ({ children }) => {
 
   const handleViewChange = (view) => {
     setSelectedView(view);
-  }; // Verificar disponibilidad del profesional para una nueva cita
+  };
+
+  // Verificar disponibilidad del profesional para una nueva cita
   const checkEmployeeAvailability = async (
     employeeId,
     startDate,
@@ -273,6 +302,17 @@ const AppointmentManagerContainer = ({ children }) => {
       return result;
     } catch (error) {
       console.error("Error verificando disponibilidad con la API:", error);
+
+      // Mostrar notificación solo si no es un error de conexión normal
+      if (
+        !error.message?.includes("timeout") &&
+        !error.message?.includes("network")
+      ) {
+        showInfo(
+          "Usando verificación local",
+          "No se pudo verificar la disponibilidad con el servidor"
+        );
+      }
 
       // Fallback a verificación local en caso de error de conexión
       console.warn("Usando verificación local como fallback");

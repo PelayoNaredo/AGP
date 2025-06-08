@@ -11,50 +11,59 @@ import FileUploader from "../../../components/fileUploader";
 const ExpenseModal = ({ visible, onClose, expense, onSave, warning }) => {
   const { themeObject } = useTheme();
   const styles = createStyles(themeObject);
-
   const [formData, setFormData] = useState({
     tipo_gasto: "fijo",
     concepto: "",
     monto: "",
-    fecha_gasto: new Date().toISOString().split("T")[0],
+    fecha_gasto: new Date().toISOString().split("T")[0], // Inicializar con la fecha actual
     categoria: "",
     comentarios: "",
     comprobante: null,
   });
 
   const [showDatePicker, setShowDatePicker] = useState(false);
-
   useEffect(() => {
     if (expense) {
+      // Si tenemos un gasto existente, usamos sus datos
+      const fechaGasto = expense.fecha_gasto;
+
       setFormData({
         tipo_gasto: expense.tipo_gasto || "fijo",
         concepto: expense.concepto || "",
         monto: expense.monto ? expense.monto.toString() : "",
-        fecha_gasto:
-          expense.fecha_gasto || new Date().toISOString().split("T")[0],
+        fecha_gasto: fechaGasto || new Date().toISOString().split("T")[0],
         categoria: expense.categoria || "",
         comentarios: expense.comentarios || "",
         comprobante: expense.comprobante || null,
       });
     } else {
+      // Para un nuevo gasto, inicializamos con fecha de hoy
+      const hoy = new Date();
+      const year = hoy.getFullYear();
+      const month = String(hoy.getMonth() + 1).padStart(2, "0");
+      const day = String(hoy.getDate()).padStart(2, "0");
+      const fechaHoy = `${year}-${month}-${day}`;
+
       setFormData({
         tipo_gasto: "fijo",
         concepto: "",
         monto: "",
-        fecha_gasto: new Date().toISOString().split("T")[0],
+        fecha_gasto: fechaHoy,
         categoria: "",
         comentarios: "",
         comprobante: null,
       });
     }
   }, [expense]);
-
   const handleSubmit = () => {
+    // Aseguramos que la fecha se mantenga exactamente como la ingresó el usuario
     const expenseData = {
       ...formData,
       monto: parseFloat(formData.monto),
+      fecha_gasto: formData.fecha_gasto, // Mantenemos la fecha tal como está en el estado
     };
 
+    // Incluimos una verificación adicional para depurar
     onSave(expenseData);
   };
   const isFormValid = () => {
@@ -107,7 +116,6 @@ const ExpenseModal = ({ visible, onClose, expense, onSave, warning }) => {
           Variable
         </CustomButton>
       </View>
-
       <View style={styles.formGroup}>
         <Text style={styles.label}>Concepto *</Text>
         <TextInput
@@ -120,7 +128,6 @@ const ExpenseModal = ({ visible, onClose, expense, onSave, warning }) => {
           placeholderTextColor={themeObject.colors.placeholder}
         />
       </View>
-
       <View style={styles.formGroup}>
         <Text style={styles.label}>Monto *</Text>
         <TextInput
@@ -137,7 +144,6 @@ const ExpenseModal = ({ visible, onClose, expense, onSave, warning }) => {
           placeholderTextColor={themeObject.colors.placeholder}
         />
       </View>
-
       <View style={styles.formGroup}>
         <Text style={styles.label}>Fecha</Text>
         <CustomButton
@@ -147,8 +153,11 @@ const ExpenseModal = ({ visible, onClose, expense, onSave, warning }) => {
         >
           {formData.fecha_gasto}
         </CustomButton>
+        {/* Añadir texto informativo para confirmar la fecha seleccionada */}
+        <Text style={styles.dateInfo}>
+          Fecha seleccionada: {formData.fecha_gasto}
+        </Text>
       </View>
-
       <View style={styles.formGroup}>
         <Text style={styles.label}>Categoría *</Text>
         <CustomPicker
@@ -160,7 +169,6 @@ const ExpenseModal = ({ visible, onClose, expense, onSave, warning }) => {
           placeholder="Seleccione categoría"
         />
       </View>
-
       <View style={styles.formGroup}>
         <Text style={styles.label}>Comentarios</Text>
         <TextInput
@@ -176,7 +184,6 @@ const ExpenseModal = ({ visible, onClose, expense, onSave, warning }) => {
           textAlignVertical="top"
         />
       </View>
-
       <View style={styles.formGroup}>
         <Text style={styles.label}>Comprobante</Text>
         <FileUploader
@@ -186,19 +193,34 @@ const ExpenseModal = ({ visible, onClose, expense, onSave, warning }) => {
           currentFile={formData.comprobante}
         />
       </View>
-
       <DatePickerModal
         locale="es"
         mode="single"
         visible={showDatePicker}
         onDismiss={() => setShowDatePicker(false)}
-        date={new Date(formData.fecha_gasto)}
+        date={
+          formData.fecha_gasto ? new Date(formData.fecha_gasto) : new Date()
+        }
         onConfirm={({ date }) => {
+          // Aseguramos que se capture correctamente la fecha evitando problemas de zona horaria
+
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, "0"); // +1 porque en JS los meses van de 0 a 11
+          const day = String(date.getDate()).padStart(2, "0");
+
+          // Construimos la fecha en formato YYYY-MM-DD
+          const formattedDate = `${year}-${month}-${day}`;
+
           setFormData((prev) => ({
             ...prev,
-            fecha_gasto: date.toISOString().split("T")[0],
+            fecha_gasto: formattedDate,
           }));
           setShowDatePicker(false);
+        }}
+        presentationStyle="pageSheet"
+        validRange={{
+          startDate: new Date(1900, 0, 1), // Permite seleccionar fechas desde el año 1900
+          endDate: new Date(2100, 11, 31), // Hasta el año 2100
         }}
       />
     </ModalTemplate>
@@ -239,6 +261,12 @@ const createStyles = (theme) =>
       flexDirection: "row",
       gap: 8,
       marginBottom: 16,
+    },
+    dateInfo: {
+      fontSize: 12,
+      color: theme.colors.text,
+      marginTop: 4,
+      fontStyle: "italic",
     },
   });
 

@@ -5,21 +5,20 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
-  Alert,
-  Pressable,
   Platform,
 } from "react-native";
-import { Card } from "react-native-paper";
 import { useTheme } from "../../../context/ThemeContext";
 import CustomButton from "../../../components/customButton";
 import { Services } from "../../../api/index";
 import OrderModal from "./ordersModal";
-import { formatDate, safeToFixed } from "../../../utils/helpers";
+import OrderCard from "./OrderCard";
+import useNotifications from "../../../hooks/useNotifications";
 
 // Componente OrdersBody para manejar la lógica de pedidos
 const OrdersBody = () => {
   const { themeObject } = useTheme();
   const styles = createStyles(themeObject);
+  const { showError, showConfirmDialog, showSuccess } = useNotifications();
 
   const [orders, setOrders] = useState([]);
   const [orderDetails, setOrderDetails] = useState([]);
@@ -46,7 +45,7 @@ const OrdersBody = () => {
         setInventory(inventoryData);
         setSuppliers(suppliersData);
       } catch (error) {
-        Alert.alert("Error", "Error cargando datos");
+        showError("Error", "Error cargando datos");
       } finally {
         setIsLoading(false);
       }
@@ -81,7 +80,7 @@ const OrdersBody = () => {
       const ordersData = await Services.Data.Orders.getAll();
       setOrders(ordersData);
     } catch (error) {
-      Alert.alert("Error", "Error cargando pedidos");
+      showError("Error", "Error cargando pedidos");
     } finally {
       setIsLoading(false);
     }
@@ -133,7 +132,7 @@ const OrdersBody = () => {
         await updateInventoryOnComplete(orderId);
       }
     } catch (error) {
-      Alert.alert("Error", "No se pudo actualizar el estado");
+      showError("Error", "No se pudo actualizar el estado");
     }
   };
 
@@ -157,66 +156,60 @@ const OrdersBody = () => {
         await loadOrders();
       }
     } catch (error) {
-      Alert.alert("Error", "No se pudo eliminar el producto del pedido");
+      showError("Error", "No se pudo eliminar el producto del pedido");
     }
   };
 
+  // Manejar la eliminación de un pedido completo
+  const handleDeleteOrder = async (orderId) => {
+    showConfirmDialog(
+      "Eliminar Pedido",
+      "¿Estás seguro de que deseas eliminar este pedido? Esta acción no se puede deshacer.",
+      async () => {
+        try {
+          // Primero eliminar todos los detalles del pedido
+          const orderDetailsToDelete = orderDetails.filter(
+            (detail) => detail.id_pedido === orderId
+          );
+
+          for (const detail of orderDetailsToDelete) {
+            await Services.Data.OrderDetails.delete(detail.id_detalle);
+          }
+
+          // Luego eliminar el pedido principal
+          await Services.Data.Orders.delete(orderId);
+
+          // Actualizar la lista de pedidos y detalles
+          const [updatedOrders, updatedDetails] = await Promise.all([
+            Services.Data.Orders.getAll(),
+            Services.Data.OrderDetails.getAll(),
+          ]);
+
+          setOrders(updatedOrders);
+          setOrderDetails(updatedDetails);
+          showSuccess("Pedido eliminado correctamente");
+        } catch (error) {
+          showError("Error", "No se pudo eliminar el pedido");
+          console.error("Error eliminando pedido:", error);
+        }
+      },
+      () => {}, // Función onCancel vacía
+      "Eliminar",
+      "Cancelar"
+    );
+  };
   // Renderizar cada pedido
   const renderOrderItem = ({ item }) => {
-    const details = orderDetails.filter((d) => d.id_pedido === item.id_pedido);
-
     return (
-      <Card style={styles.orderCard}>
-        <Pressable onPress={() => setSelectedOrder(item)}>
-          <View style={styles.orderHeader}>
-            <Text style={styles.orderTitle}>Pedido #{item.id_pedido}</Text>
-            <Text
-              style={[
-                styles.statusBadge,
-                { backgroundColor: getStatusColor(item.estado, themeObject) },
-              ]}
-            >
-              {item.estado}
-            </Text>
-          </View>
-
-          <Text style={styles.supplierText}>
-            Proveedor: {getSupplierName(item.id_proveedor)}
-          </Text>
-
-          <View style={styles.datesContainer}>
-            <Text style={styles.dateText}>
-              Pedido: {formatDate(item.fecha_pedido)}
-            </Text>
-            <Text style={styles.dateText}>
-              Entrega prevista: {formatDate(item.fecha_entrega_estimada)}
-            </Text>
-          </View>
-
-          {details.map((detail) => (
-            <View key={detail.id_detalle} style={styles.detailRow}>
-              <Text style={styles.detailText}>
-                {
-                  inventory.find((p) => p.id_producto === detail.id_producto)
-                    ?.nombre_producto
-                }
-              </Text>
-              <Text style={styles.detailText}>
-                {detail.cantidad} x ${safeToFixed(detail.precio_unitario)}
-              </Text>
-              <Text style={styles.detailText}>
-                ${safeToFixed(detail.subtotal)}
-              </Text>
-            </View>
-          ))}
-
-          <View style={styles.totalContainer}>
-            <Text style={styles.totalText}>
-              Total: ${safeToFixed(item.total)}
-            </Text>
-          </View>
-        </Pressable>
-      </Card>
+      <OrderCard
+        order={item}
+        onEdit={setSelectedOrder}
+        onDelete={handleDeleteOrder}
+        onStatusChange={handleStatusChange}
+        orderDetails={orderDetails}
+        inventory={inventory}
+        getSupplierName={getSupplierName}
+      />
     );
   };
 
@@ -275,16 +268,7 @@ const OrdersBody = () => {
   );
 };
 
-// Función auxiliar para colores de estado
-const getStatusColor = (status, theme) => {
-  const statusColors = {
-    pendiente: theme.colors.warning,
-    completado: theme.colors.success,
-    cancelado: theme.colors.error,
-    enviado: theme.colors.info,
-  };
-  return statusColors[status.toLowerCase()] || theme.colors.placeholder;
-};
+// Los estilos de estado ahora se manejan en el componente OrderCard
 
 const createStyles = (theme) =>
   StyleSheet.create({
@@ -292,73 +276,6 @@ const createStyles = (theme) =>
       flex: 1,
       padding: 16,
       backgroundColor: theme.colors.background,
-    },
-    orderCard: {
-      backgroundColor: theme.colors.surface,
-      borderRadius: theme.roundness,
-      padding: 16,
-      margin: 10,
-      ...Platform.select({
-        web: {
-          transition: "transform 0.2s",
-          ":hover": {
-            transform: "translateY(-2px)",
-          },
-        },
-      }),
-    },
-    orderHeader: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 8,
-    },
-    orderTitle: {
-      fontSize: 18,
-      fontWeight: "600",
-      color: theme.colors.text,
-    },
-    statusBadge: {
-      paddingVertical: 4,
-      paddingHorizontal: 12,
-      borderRadius: 20,
-      color: theme.colors.buttonWhite,
-      fontSize: 12,
-      fontWeight: "500",
-    },
-    supplierText: {
-      color: theme.colors.text,
-    },
-    datesContainer: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      marginVertical: 8,
-    },
-    dateText: {
-      fontSize: 12,
-      color: theme.colors.placeholder,
-    },
-    detailRow: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      marginVertical: 4,
-    },
-    detailText: {
-      fontSize: 14,
-      color: theme.colors.text,
-      flex: 1,
-    },
-    totalContainer: {
-      borderTopWidth: 1,
-      borderColor: theme.colors.border,
-      marginTop: 8,
-      paddingTop: 8,
-    },
-    totalText: {
-      fontSize: 16,
-      fontWeight: "700",
-      color: theme.colors.text,
-      textAlign: "right",
     },
     addButton: {
       marginBottom: 16,

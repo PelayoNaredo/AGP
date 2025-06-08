@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   Pressable,
   Platform,
   Linking,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import CustomButton from "../../../components/customButton";
@@ -14,11 +13,16 @@ import ModalTemplate from "../../../components/modalTemplate";
 import { useTheme } from "../../../context/ThemeContext";
 import { Services } from "../../../api";
 import { NGROK_HOST } from "@env";
+import useNotifications from "../../../hooks/useNotifications";
+import PopupMenu, { MenuItem } from "../../../components/popupMenu";
 
 // Card de empleado, muestra información detallada de un empleado y permite editar o eliminar un empleado.
 const EmployeeCard = ({ employee, onEdit, onDelete }) => {
   const { themeObject } = useTheme();
+  const { showError, showSuccess, showInfo } = useNotifications();
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const menuButtonRef = useRef(null);
 
   const statusColor = employee.activo
     ? themeObject.colors.success
@@ -43,8 +47,9 @@ const EmployeeCard = ({ employee, onEdit, onDelete }) => {
   }; // Función para descargar documentos o abrirlos en el navegador
   const handleDocumentPress = async (doc) => {
     try {
-      // Si no hay documento para descargar, salir
+      // Si no hay documento para descargar, mostrar notificación y salir
       if (!doc) {
+        showInfo("Información", "No hay documento disponible para descargar");
         return;
       }
 
@@ -83,11 +88,12 @@ const EmployeeCard = ({ employee, onEdit, onDelete }) => {
 
           // Construir la URL para descargar directamente
           const baseUrl = NGROK_HOST || "http://localhost:3001";
-          const timestamp = Date.now(); // Evitar caché
-
-          // Usar endpoint que funciona correctamente y abrir en nueva pestaña
+          const timestamp = Date.now(); // Evitar caché          // Usar endpoint que funciona correctamente y abrir en nueva pestaña
           const downloadUrl = `${baseUrl}/api/media/${filenamePart}?t=${timestamp}&download=true&token=${token}`;
           window.open(downloadUrl, "_blank");
+
+          // Mostrar notificación de éxito
+          showSuccess("Documento abierto correctamente");
         } catch (error) {
           console.error("[EmployeeCard] Error en descarga web:", error);
           throw error;
@@ -109,13 +115,14 @@ const EmployeeCard = ({ employee, onEdit, onDelete }) => {
           // Construir URL para abrir en el navegador
           const baseUrl = NGROK_HOST || "http://localhost:3001";
           const timestamp = Date.now();
-          const finalUrl = `${baseUrl}/api/media/${filenamePart}?t=${timestamp}&download=true&token=${token}`;
-
-          // Abrir en el navegador del dispositivo
+          const finalUrl = `${baseUrl}/api/media/${filenamePart}?t=${timestamp}&download=true&token=${token}`; // Abrir en el navegador del dispositivo
           Linking.openURL(finalUrl);
+
+          // Mostrar notificación de éxito
+          showSuccess("Abriendo documento...");
         } catch (error) {
           console.error("[EmployeeCard] Error al abrir documento:", error);
-          Alert.alert(
+          showError(
             "Error",
             "No se pudo abrir el documento. Intente nuevamente."
           );
@@ -123,7 +130,7 @@ const EmployeeCard = ({ employee, onEdit, onDelete }) => {
       }
     } catch (error) {
       console.error("[EmployeeCard] Error al procesar documento:", error);
-      Alert.alert(
+      showError(
         "Error",
         "No se pudo procesar el documento. Intente nuevamente."
       );
@@ -194,26 +201,40 @@ const EmployeeCard = ({ employee, onEdit, onDelete }) => {
         </View>
 
         <View style={styles.actions}>
-          <CustomButton
-            variant="ghost"
-            size="sm"
-            ionIconLeft="create-outline"
-            onPress={onEdit}
-            style={styles.actionButton}
-            accessibilityLabel="Editar empleado"
+          <PopupMenu
+            visible={showMenu}
+            onDismiss={() => setShowMenu(false)}
+            anchor={
+              <CustomButton
+                ref={menuButtonRef}
+                variant="ghost"
+                size="sm"
+                ionIconLeft="ellipsis-vertical"
+                onPress={() => setShowMenu(true)}
+                style={styles.actionButton}
+                accessibilityLabel="Opciones para empleado"
+              />
+            }
           >
-            {Platform.OS === "web" && "Editar"}
-          </CustomButton>
-          <CustomButton
-            variant="error"
-            size="sm"
-            ionIconLeft="trash-outline"
-            onPress={() => setIsDeleteModalVisible(true)}
-            style={styles.actionButton}
-            accessibilityLabel="Eliminar empleado"
-          >
-            {Platform.OS === "web" && "Eliminar"}
-          </CustomButton>
+            <MenuItem
+              title="Editar"
+              leadingIcon="create-outline"
+              onPress={() => {
+                setShowMenu(false);
+                onEdit();
+              }}
+            />
+            <MenuItem
+              title="Eliminar"
+              leadingIcon="trash-outline"
+              iconColor={themeObject.colors.error}
+              titleStyle={{ color: themeObject.colors.error }}
+              onPress={() => {
+                setShowMenu(false);
+                setIsDeleteModalVisible(true);
+              }}
+            />
+          </PopupMenu>
         </View>
       </View>
       {/* Contract Info */}
@@ -448,6 +469,8 @@ const EmployeeCard = ({ employee, onEdit, onDelete }) => {
         confirmAction={() => {
           setIsDeleteModalVisible(false);
           onDelete();
+          // Mostrar notificación después de eliminar
+          showSuccess("Empleado eliminado correctamente");
         }}
         confirmDisabled={false}
       />
@@ -564,9 +587,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     marginTop: Platform.select({ android: 4, default: 0 }),
+    justifyContent: "flex-end", // Alineación a la derecha para el menú
   },
   actionButton: {
-    minWidth: Platform.select({ web: 100, default: 40 }),
+    minWidth: Platform.select({ web: 40, default: 40 }),
     height: 40,
   },
   contractInfoContainer: {
@@ -581,6 +605,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 8,
     backgroundColor: "#00000010",
+  },
+  contractText: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   contentGrid: {
     flexDirection: "row",

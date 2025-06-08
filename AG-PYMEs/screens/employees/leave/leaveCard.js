@@ -1,13 +1,18 @@
-import React from "react";
+import React, { useState, useRef } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Card } from "react-native-paper";
 import { Ionicons } from "@expo/vector-icons";
 import CustomButton from "../../../components/customButton";
 import { useTheme } from "../../../context/ThemeContext";
+import PopupMenu, { MenuItem } from "../../../components/popupMenu";
+import useNotifications from "../../../hooks/useNotifications";
 
 // Componente LeaveCard muestra la información de una baja laboral de un empleado.
 const LeaveCard = ({ leave, employee, onEdit, onDelete }) => {
   const { themeObject } = useTheme();
+  const { showSuccess, showError, showConfirmDialog } = useNotifications();
+  const [showMenu, setShowMenu] = useState(false);
+  const menuButtonRef = useRef(null);
 
   const statusColors = {
     temporal: themeObject.colors.warning,
@@ -49,7 +54,6 @@ const LeaveCard = ({ leave, employee, onEdit, onDelete }) => {
           backgroundColor: themeObject.colors.surface,
         },
       ]}
-      onPress={() => onEdit(leave)}
     >
       <View style={styles.header}>
         <View style={styles.employeeInfo}>
@@ -83,15 +87,48 @@ const LeaveCard = ({ leave, employee, onEdit, onDelete }) => {
             {employee.cargo}
           </Text>
         </View>
-
         <View style={styles.actions}>
-          <CustomButton
-            variant="error"
-            size="sm"
-            ionIconLeft="trash-outline"
-            onPress={() => onDelete(leave)}
-            style={styles.editButton}
-          />
+          <PopupMenu
+            visible={showMenu}
+            onDismiss={() => setShowMenu(false)}
+            anchor={
+              <CustomButton
+                ref={menuButtonRef}
+                variant="ghost"
+                size="sm"
+                ionIconLeft="ellipsis-vertical"
+                onPress={() => setShowMenu(true)}
+                style={styles.actionButton}
+                accessibilityLabel="Opciones para baja"
+              />
+            }
+          >
+            <MenuItem
+              title="Editar"
+              leadingIcon="create-outline"
+              onPress={() => {
+                setShowMenu(false);
+                onEdit(leave);
+              }}
+            />
+            <MenuItem
+              title="Eliminar"
+              leadingIcon="trash-outline"
+              iconColor={themeObject.colors.error}
+              titleStyle={{ color: themeObject.colors.error }}
+              onPress={() => {
+                setShowMenu(false);
+                showConfirmDialog(
+                  "Eliminar baja laboral",
+                  "¿Está seguro de que desea eliminar esta baja laboral? Esta acción no se puede deshacer.",
+                  () => {
+                    onDelete(leave);
+                    showSuccess("Baja laboral eliminada correctamente");
+                  }
+                );
+              }}
+            />
+          </PopupMenu>
         </View>
       </View>
 
@@ -261,7 +298,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
   },
-  editButton: {
+  actionButton: {
     width: 32,
     height: 32,
     padding: 0,
@@ -269,6 +306,7 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     gap: 8,
+    justifyContent: "flex-end",
   },
 });
 

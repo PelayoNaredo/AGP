@@ -6,19 +6,27 @@ import {
   Text,
   ActivityIndicator,
   useWindowDimensions,
+  FlatList,
 } from "react-native";
-import { FlashList } from "@shopify/flash-list";
 import { useTheme } from "../../../context/ThemeContext";
 import CustomButton from "../../../components/customButton";
 import SearchHeaderBar from "../../../components/searchHeaderBar";
 import { Services } from "../../../api/index";
 import ExpensesModal from "./expensesModal";
+import {
+  usePerformanceMonitor,
+  PerformanceOverlay,
+} from "../../../utils/PerformanceMonitor";
 
 // Componente principal para gestionar gastos
 const ExpensesPage = () => {
   const { themeObject } = useTheme();
   const { width } = useWindowDimensions();
   const isMobile = width < 768; // Considerar dispositivo móvil si el ancho es menor a 768px
+
+  // Monitor de performance
+  const performanceMetrics = usePerformanceMonitor("ExpensesPage");
+
   const [expenses, setExpenses] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -99,23 +107,18 @@ const ExpensesPage = () => {
     const date = new Date(selectedDate.year, selectedDate.month - 1);
     return date.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
   }, [selectedDate]);
-
   // Función optimizada para procesar gastos
   const processExpenses = useCallback((data) => {
-    const now = Date.now();
-    const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
-
     let fixed = [];
     let variable = [];
     let fixedTotal = 0;
     let variableTotal = 0;
 
     for (const item of data) {
-      const itemDate = new Date(item.fecha_gasto).getTime();
       if (item.tipo_gasto === "fijo") {
         fixed.push(item);
         fixedTotal += Number(item.monto);
-      } else if (itemDate >= thirtyDaysAgo) {
+      } else {
         variable.push(item);
         variableTotal += Number(item.monto);
       }
@@ -140,7 +143,6 @@ const ExpensesPage = () => {
     () => processExpenses(expenses),
     [expenses, processExpenses]
   );
-
   // Componente de tarjeta memoizado
   const MemoizedExpenseCard = React.memo(({ item }) => (
     <Pressable
@@ -149,7 +151,7 @@ const ExpensesPage = () => {
     >
       <View style={styles.cardHeader}>
         <Text style={[styles.cardTitle, { color: themeObject.colors.primary }]}>
-          ${item.monto}
+          ${item.monto || "0"}
         </Text>
         <View
           style={[
@@ -162,17 +164,21 @@ const ExpensesPage = () => {
             },
           ]}
         >
-          <Text style={styles.typeText}>{item.tipo_gasto.toUpperCase()}</Text>
+          <Text style={styles.typeText}>
+            {(item.tipo_gasto || "").toUpperCase()}
+          </Text>
         </View>
       </View>
 
       <Text style={{ color: themeObject.colors.text, fontWeight: "500" }}>
-        {item.concepto}
+        {item.concepto || ""}
       </Text>
 
       <View style={styles.cardFooter}>
         <Text style={{ color: themeObject.colors.text }}>
-          {new Date(item.fecha_gasto).toLocaleDateString()}
+          {item.fecha_gasto
+            ? new Date(item.fecha_gasto).toLocaleDateString()
+            : ""}
         </Text>
         {item.comentarios && (
           <Text style={{ color: themeObject.colors.text }}>
@@ -221,7 +227,16 @@ const ExpensesPage = () => {
       console.error("Error guardando gasto:", error);
       setValidationError("Error al guardar el gasto");
     }
-  };
+  }; // Layout optimizado para FlatList - mejora significativamente el scroll
+  const getItemLayout = useCallback(
+    (data, index) => ({
+      length: 120, // altura estimada del item (card + margin)
+      offset: 120 * index,
+      index,
+    }),
+    []
+  );
+
   // Componente de sección optimizado con manejo de carga
   const ExpenseSection = React.memo(({ title, data, type, total }) => (
     <View style={styles.sectionContainer}>
@@ -253,13 +268,19 @@ const ExpensesPage = () => {
             />
           </View>
         ) : (
-          <FlashList
+          <FlatList
             data={data}
             renderItem={({ item }) => <MemoizedExpenseCard item={item} />}
-            estimatedItemSize={100}
             keyExtractor={(item) => item.id_gasto.toString()}
             showsVerticalScrollIndicator={true}
-            contentContainerStyle={styles.flashListContent}
+            contentContainerStyle={styles.flatListContent}
+            removeClippedSubviews={true}
+            windowSize={10}
+            initialNumToRender={8}
+            maxToRenderPerBatch={5}
+            updateCellsBatchingPeriod={50}
+            onEndReachedThreshold={0.5}
+            getItemLayout={getItemLayout}
             ListEmptyComponent={() => (
               <Text
                 style={[
@@ -358,6 +379,9 @@ const ExpensesPage = () => {
           warning={validationError}
         />
       </View>
+
+      {/* Monitor de performance solo en desarrollo */}
+      <PerformanceOverlay visible={__DEV__} />
     </View>
   );
 };
@@ -457,7 +481,7 @@ const styles = StyleSheet.create({
   listWrapperMobile: {
     paddingTop: 0, // No necesita espacio para el header en móvil
   },
-  flashListContent: {
+  flatListContent: {
     paddingHorizontal: 16,
   },
   totalText: {

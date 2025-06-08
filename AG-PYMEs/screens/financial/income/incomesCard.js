@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, Pressable } from "react-native";
 import { useTheme } from "../../../context/ThemeContext";
 
 //Componente que muestra los detalles de un ingreso
-const IncomesCard = ({ item, onPress, compact = false }) => {
+const IncomesCard = ({ item, onPress }) => {
   const { themeObject } = useTheme();
 
   // Obtener valores del item o mostrar valores por defecto
@@ -60,116 +60,51 @@ const IncomesCard = ({ item, onPress, compact = false }) => {
     },
   };
 
-  // Versión compacta de la tarjeta (para listas)
-  if (compact) {
-    return (
-      <Pressable
-        style={[styles.card, dynamicStyles.card, styles.compactCard]}
-        onPress={onPress}
-      >
-        <View style={styles.cardHeader}>
-          <Text style={[styles.amount, dynamicStyles.amount]}>
-            ${parseFloat(ingresos || 0).toFixed(2)}
-          </Text>
-          <Text style={[styles.date, dynamicStyles.date]}>{formattedDate}</Text>
-        </View>
-
-        {concepto && (
-          <Text style={[styles.title, dynamicStyles.title]} numberOfLines={1}>
-            {concepto}
-          </Text>
-        )}
-
-        {comentarios && (
-          <Text
-            style={[styles.comentarios, dynamicStyles.comentarios]}
-            numberOfLines={2}
-          >
-            {comentarios}
-          </Text>
-        )}
-
-        <View style={styles.tagContainer}>
-          {categoria && (
-            <View style={[styles.badge, dynamicStyles.badge]}>
-              <Text style={[styles.badgeText, dynamicStyles.badgeText]}>
-                {categoria}
-              </Text>
-            </View>
-          )}
-
-          {metodo_ingreso && (
-            <View style={[styles.badge, dynamicStyles.badge]}>
-              <Text style={[styles.badgeText, dynamicStyles.badgeText]}>
-                {metodo_ingreso}
-              </Text>
-            </View>
-          )}
-        </View>
-      </Pressable>
-    );
-  }
-
-  // Versión completa con todos los detalles
   return (
-    <View style={[styles.card, dynamicStyles.card]} onPress={onPress}>
+    <Pressable
+      style={[styles.card, dynamicStyles.card, styles.compactCard]}
+      onPress={onPress}
+    >
       <View style={styles.cardHeader}>
-        <View>
-          <Text style={[styles.amount, dynamicStyles.amount]}>
-            ${parseFloat(ingresos || 0).toFixed(2)}
-          </Text>
-          {concepto && (
-            <Text style={[styles.title, dynamicStyles.title]}>{concepto}</Text>
-          )}
-        </View>
-        <View style={styles.dateContainer}>
-          <Text style={[styles.date, dynamicStyles.date]}>{formattedDate}</Text>
-          {id_ingreso && (
-            <Text style={[styles.subtitle, dynamicStyles.subtitle]}>
-              ID: {id_ingreso}
-            </Text>
-          )}
-        </View>
+        <Text style={[styles.amount, dynamicStyles.amount]}>
+          ${parseFloat(ingresos || 0).toFixed(2)}
+        </Text>
+        <Text style={[styles.date, dynamicStyles.date]}>{formattedDate}</Text>
       </View>
 
-      {/* Detalles completos */}
-      <View style={styles.detailsContainer}>
-        {comentarios && (
-          <View style={styles.detailRow}>
-            <Text style={[styles.label, dynamicStyles.label]}>
-              Comentarios:
-            </Text>
-            <Text style={[styles.value, dynamicStyles.value]}>
-              {comentarios}
-            </Text>
-          </View>
-        )}
+      {concepto && (
+        <Text style={[styles.title, dynamicStyles.title]} numberOfLines={1}>
+          {concepto}
+        </Text>
+      )}
 
+      {comentarios && (
+        <Text
+          style={[styles.comentarios, dynamicStyles.comentarios]}
+          numberOfLines={2}
+        >
+          {comentarios}
+        </Text>
+      )}
+
+      <View style={styles.tagContainer}>
         {categoria && (
-          <View style={styles.detailRow}>
-            <Text style={[styles.label, dynamicStyles.label]}>Categoría:</Text>
-            <View style={[styles.badge, dynamicStyles.badge]}>
-              <Text style={[styles.badgeText, dynamicStyles.badgeText]}>
-                {categoria}
-              </Text>
-            </View>
+          <View style={[styles.badge, dynamicStyles.badge]}>
+            <Text style={[styles.badgeText, dynamicStyles.badgeText]}>
+              {categoria}
+            </Text>
           </View>
         )}
 
         {metodo_ingreso && (
-          <View style={styles.detailRow}>
-            <Text style={[styles.label, dynamicStyles.label]}>
-              Método de ingreso:
+          <View style={[styles.badge, dynamicStyles.badge]}>
+            <Text style={[styles.badgeText, dynamicStyles.badgeText]}>
+              {metodo_ingreso}
             </Text>
-            <View style={[styles.badge, dynamicStyles.badge]}>
-              <Text style={[styles.badgeText, dynamicStyles.badgeText]}>
-                {metodo_ingreso}
-              </Text>
-            </View>
           </View>
         )}
       </View>
-    </View>
+    </Pressable>
   );
 };
 
@@ -220,6 +155,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 4,
     marginBottom: 8,
+  },
+  cardActions: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    flexDirection: "row",
+    zIndex: 10,
+  },
+  actionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+    elevation: 2,
   },
   detailsContainer: {
     marginTop: 8,

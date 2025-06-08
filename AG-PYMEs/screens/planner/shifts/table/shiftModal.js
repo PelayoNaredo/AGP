@@ -6,6 +6,7 @@ import CustomButton from "../../../../components/customButton";
 import CustomPicker from "../../../../components/customPicker";
 import TimeSelector from "../../../../components/timeSelectorModal";
 import Ionicons from "react-native-vector-icons/Ionicons";
+import useNotifications from "../../../../hooks/useNotifications";
 
 // Componente ShiftModal para crear o editar turnos
 const ShiftModal = ({
@@ -20,6 +21,7 @@ const ShiftModal = ({
   preselectedDay,
 }) => {
   const { themeObject } = useTheme();
+  const { showConfirmDialog } = useNotifications();
   const styles = createStyles(themeObject);
 
   const [formData, setFormData] = useState({
@@ -33,7 +35,6 @@ const ShiftModal = ({
     index: -1,
     type: null,
   });
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -103,20 +104,30 @@ const ShiftModal = ({
       (formData.intervalos.length > 0 || hasValidNewIntervals)
     );
   };
-
   const removeInterval = (index) => {
-    setFormData((prev) => ({
-      ...prev,
-      intervalos: prev.intervalos.filter((_, i) => i !== index),
-    }));
+    showConfirmDialog(
+      "Eliminar intervalo",
+      "¿Está seguro que desea eliminar este intervalo de trabajo?",
+      () => {
+        setFormData((prev) => ({
+          ...prev,
+          intervalos: prev.intervalos.filter((_, i) => i !== index),
+        }));
+      }
+    );
   };
 
   const addTimeEntry = () => {
     setTimeEntries((prev) => [...prev, { start: "", end: "" }]);
   };
-
   const removeTimeEntry = (index) => {
-    setTimeEntries((prev) => prev.filter((_, i) => i !== index));
+    showConfirmDialog(
+      "Eliminar horario",
+      "¿Está seguro que desea eliminar este horario?",
+      () => {
+        setTimeEntries((prev) => prev.filter((_, i) => i !== index));
+      }
+    );
   };
 
   const updateTimeEntry = (index, type, time) => {
@@ -134,19 +145,18 @@ const ShiftModal = ({
     { label: "Sábado", value: "6" },
     { label: "Domingo", value: "7" },
   ];
-
   const employeeItems = employees.map((emp) => ({
     label: emp.nombre,
     value: emp.id_empleado.toString(),
   })); // Función para manejar la eliminación de un turno
   const handleDelete = () => {
-    setShowDeleteConfirmation(true);
-  };
-
-  // Función para confirmar la eliminación del turno
-  const confirmDelete = () => {
-    setShowDeleteConfirmation(false);
-    onDelete && onDelete(shift);
+    showConfirmDialog(
+      "Eliminar turno",
+      "¿Está seguro que desea eliminar este turno? Esta acción no se puede deshacer.",
+      () => {
+        onDelete && onDelete(shift);
+      }
+    );
   };
 
   return (
@@ -171,7 +181,6 @@ const ShiftModal = ({
             placeholder="Seleccione un empleado"
           />
         </View>
-
         <View style={styles.formGroup}>
           <Text style={styles.label}>Día de la Semana *</Text>
           <CustomPicker
@@ -182,12 +191,14 @@ const ShiftModal = ({
             items={diasSemana}
             placeholder="Seleccione un día"
           />
-        </View>
-
+        </View>{" "}
         <View style={styles.intervalsContainer}>
           <Text style={styles.label}>Intervalos de Trabajo *</Text>
           {formData.intervalos.map((interval, index) => (
-            <View key={index} style={styles.intervalItem}>
+            <View
+              key={`existing-interval-${interval.hora_inicio}-${interval.hora_fin}-${index}`}
+              style={styles.intervalItem}
+            >
               <Text style={styles.intervalText}>
                 {interval.hora_inicio} - {interval.hora_fin}
               </Text>
@@ -202,9 +213,12 @@ const ShiftModal = ({
                 />
               </Pressable>
             </View>
-          ))}
+          ))}{" "}
           {timeEntries.map((entry, index) => (
-            <View key={`new-${index}`} style={styles.timeInputsRow}>
+            <View
+              key={`time-entry-${entry.start || "empty"}-${entry.end || "empty"}-${index}`}
+              style={styles.timeInputsRow}
+            >
               <View style={styles.timeInput}>
                 <Text style={styles.timeLabel}>Entrada</Text>
                 <CustomButton
@@ -254,7 +268,7 @@ const ShiftModal = ({
             </CustomButton>
           )}
         </View>
-      </ScrollView>
+      </ScrollView>{" "}
       <TimeSelector
         visible={showTimeSelector.index !== -1}
         onClose={() => setShowTimeSelector({ index: -1, type: null })}
@@ -264,23 +278,6 @@ const ShiftModal = ({
         }}
         initialTime="00:00"
       />
-      {/* Modal de confirmación para eliminar turno */}
-      <ModalTemplate
-        isVisible={showDeleteConfirmation}
-        title="Eliminar turno"
-        cancelLabel="Cancelar"
-        cancelAction={() => setShowDeleteConfirmation(false)}
-        confirmLabel="Eliminar"
-        confirmAction={confirmDelete}
-        confirmColor={themeObject.colors.error}
-      >
-        <Text style={styles.confirmationText}>
-          ¿Está seguro que desea eliminar este turno?
-        </Text>
-        <Text style={styles.confirmationSubtext}>
-          Esta acción no se puede deshacer.
-        </Text>
-      </ModalTemplate>
     </ModalTemplate>
   );
 };
@@ -346,18 +343,6 @@ const createStyles = (theme) =>
     deleteButton: {
       marginTop: 16,
       backgroundColor: theme.colors.error,
-    },
-    confirmationText: {
-      fontSize: 16,
-      marginBottom: 8,
-      color: theme.colors.text,
-      textAlign: "center",
-    },
-    confirmationSubtext: {
-      fontSize: 14,
-      color: theme.colors.textSecondary || theme.colors.text,
-      opacity: 0.8,
-      textAlign: "center",
     },
   });
 

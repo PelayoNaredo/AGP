@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Text,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { useTheme } from "../../../context/ThemeContext";
 import CustomButton from "../../../components/customButton";
@@ -13,11 +12,13 @@ import SearchHeaderBar from "../../../components/searchHeaderBar";
 import { Services } from "../../../api/index";
 import IncomesModal from "./incomeModal";
 import IncomesCard from "./incomesCard";
+import useNotifications from "../../../hooks/useNotifications";
 
 const PAGE_SIZE = 30;
 
 const IncomePage = () => {
   const { themeObject } = useTheme();
+  const { showError, showSuccess, showConfirmDialog } = useNotifications();
   const [state, setState] = useState({
     incomes: [],
     searchTerm: "",
@@ -50,23 +51,56 @@ const IncomePage = () => {
   useEffect(() => {
     loadIncomes();
   }, [selectedDate]);
-
   // Función para navegar entre meses
   const changeMonth = (increment) => {
-    setSelectedDate((prev) => {
-      let newMonth = prev.month + increment;
-      let newYear = prev.year;
+    // Si el modal de ingreso está abierto, mostrar confirmación antes de cambiar de mes
+    if (state.isModalVisible) {
+      showConfirmDialog(
+        "Cambio de mes",
+        "Tienes cambios sin guardar. ¿Deseas continuar sin guardar?",
+        () => {
+          // Continuar con el cambio de mes
+          setSelectedDate((prev) => {
+            let newMonth = prev.month + increment;
+            let newYear = prev.year;
 
-      if (newMonth > 12) {
-        newMonth = 1;
-        newYear += 1;
-      } else if (newMonth < 1) {
-        newMonth = 12;
-        newYear -= 1;
-      }
+            if (newMonth > 12) {
+              newMonth = 1;
+              newYear += 1;
+            } else if (newMonth < 1) {
+              newMonth = 12;
+              newYear -= 1;
+            }
 
-      return { month: newMonth, year: newYear };
-    });
+            return { month: newMonth, year: newYear };
+          });
+          // Cerrar el modal
+          setState((prev) => ({
+            ...prev,
+            isModalVisible: false,
+            selectedIncome: null,
+          }));
+        },
+        // Función para cancelar (no hace nada)
+        () => {}
+      );
+    } else {
+      // Si no hay cambios pendientes, cambiar de mes directamente
+      setSelectedDate((prev) => {
+        let newMonth = prev.month + increment;
+        let newYear = prev.year;
+
+        if (newMonth > 12) {
+          newMonth = 1;
+          newYear += 1;
+        } else if (newMonth < 1) {
+          newMonth = 12;
+          newYear -= 1;
+        }
+
+        return { month: newMonth, year: newYear };
+      });
+    }
   };
 
   // Formatear el mes y año actual
@@ -84,7 +118,7 @@ const IncomePage = () => {
       // Verificar estructura de la respuesta
       if (!response) {
         console.error("[Ingresos] La respuesta es nula o indefinida");
-        Alert.alert("Error", "La respuesta del servidor es inválida");
+        showError("Error", "La respuesta del servidor es inválida");
         return;
       }
 
@@ -109,7 +143,7 @@ const IncomePage = () => {
       });
     } catch (error) {
       console.error("[Ingresos] Error cargando ingresos:", error);
-      Alert.alert(
+      showError(
         "Error",
         `No se pudieron cargar los ingresos: ${error.message}`
       );
@@ -117,6 +151,7 @@ const IncomePage = () => {
       setState((prev) => ({ ...prev, loading: false }));
     }
   };
+
   // Confirmar acción de guardar ingreso
   const handleSaveIncome = async (incomeData) => {
     try {
@@ -125,8 +160,10 @@ const IncomePage = () => {
           state.selectedIncome.id_ingreso,
           incomeData
         );
+        showSuccess("Ingreso actualizado correctamente");
       } else {
         await Services.Data.Incomes.create(incomeData);
+        showSuccess("Nuevo ingreso guardado correctamente");
       }
       setState((prev) => ({
         ...prev,
@@ -136,9 +173,31 @@ const IncomePage = () => {
       loadIncomes();
     } catch (error) {
       console.error("[Ingresos] Error guardando ingreso:", error);
-      Alert.alert("Error", `No se pudo guardar el ingreso: ${error.message}`);
+      showError("Error", `No se pudo guardar el ingreso: ${error.message}`);
       setState((prev) => ({ ...prev, validationError: "Error al guardar" }));
     }
+  };
+  // Eliminar un ingreso
+  const handleDeleteIncome = (income) => {
+    if (!income || !income.id_ingreso) return;
+
+    showConfirmDialog(
+      "Eliminar ingreso",
+      `¿Estás seguro de que deseas eliminar el ingreso ${income.concepto}?`,
+      async () => {
+        try {
+          await Services.Data.Incomes.delete(income.id_ingreso);
+          showSuccess("Ingreso eliminado correctamente");
+          loadIncomes();
+        } catch (error) {
+          console.error("[Ingresos] Error eliminando ingreso:", error);
+          showError(
+            "Error",
+            `No se pudo eliminar el ingreso: ${error.message}`
+          );
+        }
+      }
+    );
   };
 
   // Acciones del Modal
@@ -173,14 +232,13 @@ const IncomePage = () => {
     return filteredIncomes
       .reduce((total, income) => total + parseFloat(income.ingresos || 0), 0)
       .toFixed(2);
-  }, [filteredIncomes]);
-  // Card de ingreso
+  }, [filteredIncomes]); // Card de ingreso
   const renderIncomeCard = useCallback(
     ({ item }) => (
       <IncomesCard
         item={item}
         onPress={() => handleOpenModal(item)}
-        compact={true}
+        onDelete={handleDeleteIncome}
       />
     ),
     []

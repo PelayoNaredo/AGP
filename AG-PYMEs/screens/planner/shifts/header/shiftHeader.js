@@ -7,6 +7,7 @@ import Ionicons from "react-native-vector-icons/Ionicons";
 import CopyWeekModal from "./CopyWeekModal";
 import ExportCsvModal from "./ExportCsvModal";
 import EmailModal from "./EmailModal";
+import { NotificationProvider } from "../../../../context/NotificationContext";
 
 // Función para obtener el número de semana
 const getWeekNumber = (date) => {
@@ -100,7 +101,6 @@ const ShiftHeader = ({
           size="icon"
         />
       </View>
-
       {/* Selector de Vista */}
       {isWeb ? (
         <View style={styles.viewSelectorContainer}>
@@ -280,31 +280,32 @@ const ShiftHeader = ({
           />
         </Menu>
       )}
-
       {/* Modales */}
       <Portal>
-        <CopyWeekModal
-          visible={isCopyModalVisible}
-          onDismiss={() => setIsCopyModalVisible(false)}
-          selectedDate={selectedDate}
-          themeObject={themeObject}
-          onCopyStart={handleCopyStart}
-          onCopyComplete={handleCopyComplete}
-        />
+        <NotificationProvider>
+          <CopyWeekModal
+            visible={isCopyModalVisible}
+            onDismiss={() => setIsCopyModalVisible(false)}
+            selectedDate={selectedDate}
+            themeObject={themeObject}
+            onCopyStart={handleCopyStart}
+            onCopyComplete={handleCopyComplete}
+          />
 
-        <ExportCsvModal
-          visible={isExportModalVisible}
-          onDismiss={() => setIsExportModalVisible(false)}
-          selectedDate={selectedDate}
-          themeObject={themeObject}
-        />
+          <ExportCsvModal
+            visible={isExportModalVisible}
+            onDismiss={() => setIsExportModalVisible(false)}
+            selectedDate={selectedDate}
+            themeObject={themeObject}
+          />
 
-        <EmailModal
-          visible={isEmailModalVisible}
-          onDismiss={() => setIsEmailModalVisible(false)}
-          selectedDate={selectedDate}
-          themeObject={themeObject}
-        />
+          <EmailModal
+            visible={isEmailModalVisible}
+            onDismiss={() => setIsEmailModalVisible(false)}
+            selectedDate={selectedDate}
+            themeObject={themeObject}
+          />
+        </NotificationProvider>
       </Portal>
     </View>
   );

@@ -10,7 +10,10 @@ const CustomLegend = ({ items, theme }) => (
     style={[styles.legendContainer, { backgroundColor: theme.colors.card }]}
   >
     {items.map((item, index) => (
-      <View key={index} style={styles.legendItem}>
+      <View
+        key={`legend-${item.id || item.label || index}`}
+        style={styles.legendItem}
+      >
         <View style={[styles.legendColor, { backgroundColor: item.color }]} />
         <Text style={[styles.legendText, { color: theme.colors.text }]}>
           {item.label}

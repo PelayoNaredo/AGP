@@ -13,6 +13,7 @@ import { Picker } from "@react-native-picker/picker";
 import ModalTemplate from "../../../components/modalTemplate";
 import CustomButton from "../../../components/customButton";
 import { useTheme } from "../../../context/ThemeContext";
+import useNotifications from "../../../hooks/useNotifications";
 
 const AppointmentModal = ({
   visible,
@@ -29,6 +30,7 @@ const AppointmentModal = ({
   checkEmployeeAvailability,
 }) => {
   const { themeObject } = useTheme();
+  const { showConfirmDialog, showSuccess, showError } = useNotifications();
   const [formData, setFormData] = useState({
     id_cliente: "",
     id_empleado: "",
@@ -207,9 +209,10 @@ const AppointmentModal = ({
       return isEmployeeAvailable;
     } catch (error) {
       console.error("Error al verificar disponibilidad:", error);
-      setError(
-        "Error al verificar la disponibilidad. Por favor inténtelo de nuevo."
-      );
+      const errorMsg =
+        "Error al verificar la disponibilidad. Por favor inténtelo de nuevo.";
+      setError(errorMsg);
+      showError("Error de verificación", errorMsg);
       setIsAvailable(false);
       setAvailabilityChecked(true);
       return false;
@@ -224,17 +227,19 @@ const AppointmentModal = ({
       !formData.fecha_inicio ||
       !formData.fecha_fin
     ) {
-      setError(
-        "Por favor complete los campos obligatorios: Profesional, Fecha y hora de inicio y Fecha y hora de fin."
-      );
+      const errorMsg =
+        "Por favor complete los campos obligatorios: Profesional, Fecha y hora de inicio y Fecha y hora de fin.";
+      setError(errorMsg);
+      showError("Campos incompletos", errorMsg);
       return;
     }
 
     // Verificar que fecha_fin sea después de fecha_inicio
     if (formData.fecha_fin <= formData.fecha_inicio) {
-      setError(
-        "La hora de finalización debe ser posterior a la hora de inicio."
-      );
+      const errorMsg =
+        "La hora de finalización debe ser posterior a la hora de inicio.";
+      setError(errorMsg);
+      showError("Error en horario", errorMsg);
       return;
     }
 
@@ -253,6 +258,11 @@ const AppointmentModal = ({
         fecha_fin: formData.fecha_fin.toISOString(),
       });
 
+      // Mostrar mensaje de éxito según sea creación o actualización
+      showSuccess(
+        isNew ? "Cita creada correctamente" : "Cita actualizada correctamente"
+      );
+
       // Limpiar formulario y cerrar modal
       setError("");
       onClose();
@@ -261,40 +271,71 @@ const AppointmentModal = ({
 
       // Mejorar el mensaje de error según el tipo de error
       if (err.status === 409) {
-        setError(
-          `El profesional ya tiene una cita programada en ese horario. Por favor seleccione otro horario.`
-        );
+        const errorMsg = `El profesional ya tiene una cita programada en ese horario. Por favor seleccione otro horario.`;
+        setError(errorMsg);
+        showError("Conflicto de horarios", errorMsg);
       } else {
-        setError(
-          `Error al ${isNew ? "crear" : "actualizar"} la cita: ${err.message || "Error desconocido"}`
-        );
+        const errorMsg = `Error al ${isNew ? "crear" : "actualizar"} la cita: ${err.message || "Error desconocido"}`;
+        setError(errorMsg);
+        showError("Error", errorMsg);
       }
     } finally {
       setLoading(false);
     }
   };
-
-  const handleDelete = async () => {
-    try {
-      setLoading(true);
-      await onDelete();
-      onClose();
-    } catch (err) {
-      setError(`Error al eliminar la cita: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
+  const handleDelete = () => {
+    // Usar el diálogo de confirmación antes de eliminar
+    showConfirmDialog(
+      "Eliminar cita",
+      "¿Está seguro de que desea eliminar esta cita? Esta acción no se puede deshacer.",
+      async () => {
+        try {
+          setLoading(true);
+          await onDelete();
+          showSuccess("Cita eliminada correctamente");
+          onClose();
+        } catch (err) {
+          const errorMsg = `Error al eliminar la cita: ${err.message || "Error desconocido"}`;
+          setError(errorMsg);
+          showError("Error", errorMsg);
+        } finally {
+          setLoading(false);
+        }
+      }
+    );
   };
-
   const handleStatusChange = async (status) => {
     if (!appointment) return;
+
+    // Obtener un mensaje descriptivo según el estado
+    const getStatusMessage = (status) => {
+      switch (status) {
+        case "pendiente":
+          return "pendiente";
+        case "confirmada":
+          return "confirmada";
+        case "completada":
+          return "completada";
+        case "cancelada":
+          return "cancelada";
+        case "no_asistio":
+          return "marcada como no asistió";
+        default:
+          return status;
+      }
+    };
 
     try {
       setLoading(true);
       await onStatusChange(appointment.id_cita, status);
       setFormData((prev) => ({ ...prev, estado: status }));
+
+      // Mostrar notificación de éxito con mensaje específico según el estado
+      showSuccess(`Cita ${getStatusMessage(status)} correctamente`);
     } catch (err) {
-      setError(`Error al cambiar el estado: ${err.message}`);
+      const errorMsg = `Error al cambiar el estado: ${err.message || "Error desconocido"}`;
+      setError(errorMsg);
+      showError("Error", errorMsg);
     } finally {
       setLoading(false);
     }

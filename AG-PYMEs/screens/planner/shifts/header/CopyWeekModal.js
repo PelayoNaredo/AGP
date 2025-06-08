@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Text } from "react-native";
 import { Dialog, Button } from "react-native-paper";
 import { Services } from "../../../../api/index";
+import useNotifications from "../../../../hooks/useNotifications";
 
 // Función para obtener el lunes de la semana
 const getMonday = (date) => {
@@ -23,6 +24,7 @@ const CopyWeekModal = ({
   onCopyComplete,
 }) => {
   const [loading, setLoading] = useState(false);
+  const { showSuccess, showError } = useNotifications();
 
   // Función para copiar horarios de la semana anterior
   const handleCopyPreviousWeek = async () => {
@@ -54,7 +56,7 @@ const CopyWeekModal = ({
       );
 
       if (result && result.success) {
-        alert(
+        showSuccess(
           `Se copiaron ${result.data.numShifts || 0} horarios de la semana anterior.`
         );
       } else {
@@ -62,7 +64,8 @@ const CopyWeekModal = ({
       }
     } catch (error) {
       console.error("Error al copiar horarios:", error);
-      alert(
+      showError(
+        "Error",
         "Hubo un error al intentar copiar los horarios de la semana anterior."
       );
     } finally {

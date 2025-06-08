@@ -5,18 +5,19 @@ import {
   ScrollView,
   Text,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { useTheme } from "../../../context/ThemeContext";
 import LeaveCard from "./leaveCard";
 import SearchHeaderBar from "../../../components/searchHeaderBar";
 import LeaveModal from "./leaveModal";
 import { Services } from "../../../api/index";
+import useNotifications from "../../../hooks/useNotifications";
 
 // Componente LeavesBody para gestionar las bajas de empleados
 // Este componente muestra una lista de bajas y permite crear, editar y eliminar bajas
 const LeavesBody = ({ onLeaveUpdate }) => {
   const { themeObject } = useTheme();
+  const { showSuccess, showError, showConfirmDialog } = useNotifications();
   const [employees, setEmployees] = useState([]);
   const [leaves, setLeaves] = useState([]);
   const [filteredLeaves, setFilteredLeaves] = useState([]);
@@ -51,6 +52,7 @@ const LeavesBody = ({ onLeaveUpdate }) => {
       setLeaves(leavesData);
     } catch (error) {
       console.error("Error cargando datos:", error);
+      showError("Error", "No se pudieron cargar los datos");
     } finally {
       setLoading(false);
     }
@@ -119,18 +121,25 @@ const LeavesBody = ({ onLeaveUpdate }) => {
           leaveData.id_empleado,
           employeeUpdateData
         );
-      }
-
-      // Actualizar la vista
+      } // Actualizar la vista
       await loadData();
 
-      // Notificar al componente padre
+      // Notificar al componente padre y mostrar mensaje de éxito
       if (onLeaveUpdate) {
         onLeaveUpdate();
       }
+
+      showSuccess(
+        leaveToEdit
+          ? "Baja laboral actualizada correctamente"
+          : "Baja laboral registrada correctamente"
+      );
     } catch (error) {
       console.error("Error registrando/actualizando baja:", error);
-      throw error;
+      showError(
+        "Error",
+        "No se pudo guardar la información de la baja laboral"
+      );
     } finally {
       setLoading(false);
       setShowModal(false);
@@ -177,12 +186,11 @@ const LeavesBody = ({ onLeaveUpdate }) => {
       }
     } catch (error) {
       console.error("Error reactivando empleado:", error);
-      throw error;
+      showError("Error", "No se pudo reactivar al empleado");
     } finally {
       setLoading(false);
     }
-  };
-  // Eliminar baja
+  }; // Eliminar baja con confirmación
   const handleDeleteLeave = async (leave) => {
     try {
       setLoading(true);
@@ -199,15 +207,14 @@ const LeavesBody = ({ onLeaveUpdate }) => {
       setLeaves((prev) => prev.filter((l) => l.id_baja !== leave.id_baja));
 
       // Recargar datos
-      await loadData();
-
-      // Notificar al componente padre
+      await loadData(); // Notificar al componente padre y mostrar mensaje de éxito
       if (onLeaveUpdate) {
         onLeaveUpdate();
       }
+      showSuccess("Baja laboral eliminada correctamente");
     } catch (error) {
       console.error("Error eliminando baja:", error);
-      Alert.alert("Error", "No se pudo eliminar la baja");
+      showError("Error", "No se pudo eliminar la baja");
     } finally {
       setLoading(false);
     }
@@ -253,7 +260,13 @@ const LeavesBody = ({ onLeaveUpdate }) => {
                   setLeaveToEdit(leave);
                   setShowModal(true);
                 }}
-                onDelete={() => handleDeleteLeave(leave)}
+                onDelete={() => {
+                  showConfirmDialog(
+                    "Eliminar baja laboral",
+                    "¿Está seguro de que desea eliminar esta baja laboral? Esta acción no se puede deshacer.",
+                    () => handleDeleteLeave(leave)
+                  );
+                }}
               />
             );
           })

@@ -1,14 +1,17 @@
-import React from "react";
+import React, { useEffect } from "react";
 import "react-native-web";
 import { NavigationContainer } from "@react-navigation/native";
 import { StatusBar, View, ActivityIndicator } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { Provider as PaperProvider } from "react-native-paper";
 
 import Header from "./components/header.js";
 import CustomBottomTabs from "./navigation/AppNavigator";
 import { AuthProvider, useAuth } from "./context/AuthContext.js";
 import { ThemeProvider, useTheme } from "./context/ThemeContext.js";
+import { NotificationProvider } from "./context/NotificationContext";
 import LoginScreen from "./screens/LoginRegisterScreen.js";
+import { configureDatePicker } from "./utils/datePickerConfig";
 
 // Componente para manejar la barra de estado con el tema actual
 const ThemedStatusBar = () => {
@@ -84,17 +87,24 @@ const MainApp = () => {
 
 // Punto de entrada de la aplicación
 export default function App() {
+  // Configurar el locale para react-native-paper-dates al iniciar la app
+  useEffect(() => {
+    configureDatePicker();
+  }, []);
+
   return (
     <ThemeProvider>
       <AuthProvider>
-        <SafeAreaProvider
-          style={{
-            flex: 1,
-          }}
-        >
-          <ThemedStatusBar />
-          <MainApp />
-        </SafeAreaProvider>
+        <NotificationProvider>
+          <SafeAreaProvider
+            style={{
+              flex: 1,
+            }}
+          >
+            <ThemedStatusBar />
+            <MainApp />
+          </SafeAreaProvider>
+        </NotificationProvider>
       </AuthProvider>
     </ThemeProvider>
   );

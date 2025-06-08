@@ -1,24 +1,17 @@
 import React, { useState, useEffect } from "react";
-import {
-  View,
-  FlatList,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-  Alert,
-  Pressable,
-} from "react-native";
+import { View, FlatList, StyleSheet, ActivityIndicator } from "react-native";
 import { useTheme } from "../../../context/ThemeContext";
 import CustomButton from "../../../components/customButton";
 import { Services } from "../../../api/index";
 import SupplierModal from "./supplierModal";
-import { formatPhoneNumber } from "../../../utils/helpers";
-import { List, Card } from "react-native-paper";
+import SupplierCard from "./supplierCard";
+import useNotifications from "../../../hooks/useNotifications";
 
 // Componente SuppliersBody para gestionar y visualizar proveedores
 const SuppliersBody = () => {
   const { themeObject } = useTheme();
   const styles = createStyles(themeObject);
+  const { showError, showConfirmDialog, showSuccess } = useNotifications();
 
   const [suppliers, setSuppliers] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState(null);
@@ -29,7 +22,7 @@ const SuppliersBody = () => {
       const data = await Services.Data.Suppliers.getAll();
       setSuppliers(data);
     } catch (error) {
-      Alert.alert("Error", "Error cargando proveedores");
+      showError("Error", "Error cargando proveedores");
     } finally {
       setIsLoading(false);
     }
@@ -58,86 +51,44 @@ const SuppliersBody = () => {
       );
       setIsModalVisible(false);
       setSelectedSupplier(null);
+      showSuccess(
+        selectedSupplier
+          ? "Proveedor actualizado correctamente"
+          : "Proveedor creado correctamente"
+      );
     } catch (error) {
-      Alert.alert("Error", "No se pudo guardar el proveedor");
+      showError("Error", "No se pudo guardar el proveedor");
     }
   };
-
   // Manejo de eliminación de proveedor
   const handleDelete = async (id) => {
-    Alert.alert(
+    showConfirmDialog(
       "Confirmar eliminación",
       "¿Estás seguro de eliminar este proveedor?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Eliminar",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await Services.Data.Suppliers.delete(id);
-              setSuppliers((prev) => prev.filter((s) => s.id_proveedor !== id));
-            } catch (error) {
-              Alert.alert("Error", "No se pudo eliminar el proveedor");
-            }
-          },
-        },
-      ]
+      async () => {
+        try {
+          await Services.Data.Suppliers.delete(id);
+          setSuppliers((prev) => prev.filter((s) => s.id_proveedor !== id));
+          showSuccess("Proveedor eliminado correctamente");
+        } catch (error) {
+          showError("Error", "No se pudo eliminar el proveedor");
+        }
+      },
+      () => {}, // Función onCancel vacía
+      "Eliminar",
+      "Cancelar"
     );
   };
-
   // Renderiza cada proveedor en la lista
   const renderItem = ({ item }) => (
-    <Card style={styles.supplierCard}>
-      <Pressable
-        onPress={() => {
-          setSelectedSupplier(item);
-          setIsModalVisible(true);
-        }}
-      >
-        <List.Item
-          title={item.nombre_proveedor}
-          description={
-            <View style={styles.descriptionContainer}>
-              <Text style={styles.descriptionText}>CIF: {item.cif}</Text>
-              <Text style={styles.descriptionText}>{item.contacto}</Text>
-              <Text style={styles.descriptionText}>
-                {formatPhoneNumber(item.telefono)}
-              </Text>
-              <Text style={styles.descriptionText}>
-                {item.direccion_fiscal}
-              </Text>
-            </View>
-          }
-          right={() => (
-            <View style={styles.rightContainer}>
-              <Text
-                style={[
-                  styles.statusText,
-                  {
-                    backgroundColor: item.activo
-                      ? themeObject.colors.success
-                      : themeObject.colors.error,
-                  },
-                ]}
-              >
-                {item.activo ? "Activo" : "Inactivo"}
-              </Text>
-              <CustomButton
-                variant="error"
-                size="sm"
-                ionIconLeft="trash-outline"
-                onPress={() => handleDelete(item.id_proveedor)}
-                style={styles.deleteButton}
-              />
-            </View>
-          )}
-          style={styles.listItem}
-          titleStyle={styles.supplierTitle}
-          descriptionStyle={styles.supplierSubtitle}
-        />
-      </Pressable>
-    </Card>
+    <SupplierCard
+      supplier={item}
+      onSelect={(supplier) => {
+        setSelectedSupplier(supplier);
+        setIsModalVisible(true);
+      }}
+      onDelete={handleDelete}
+    />
   );
 
   if (isLoading) {
@@ -182,53 +133,11 @@ const createStyles = (theme) =>
       padding: 16,
       backgroundColor: theme.colors.background,
     },
-    supplierCard: {
-      margin: 10,
-      borderRadius: 10,
-      backgroundColor: theme.colors.surface,
-    },
-    listItem: {
-      cursor: "pointer",
-      alignItems: "center",
-    },
-    supplierTitle: {
-      color: theme.colors.text,
-      fontSize: 16,
-      fontWeight: "600",
-    },
-    supplierSubtitle: {
-      color: theme.colors.placeholder,
-      fontSize: 14,
-    },
-
     addButton: {
       marginBottom: 16,
     },
     listContent: {
       paddingBottom: 32,
-    },
-    descriptionContainer: {
-      gap: 4,
-    },
-    descriptionText: {
-      color: theme.colors.placeholder,
-      fontSize: 12,
-      marginTop: 4,
-    },
-    rightContainer: {
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "flex-start",
-      gap: 8,
-    },
-    statusText: {
-      color: theme.colors.buttonWhite,
-      textAlign: "center",
-      fontSize: 12,
-      fontWeight: "500",
-      borderRadius: 20,
-      padding: 4,
-      paddingHorizontal: 12,
     },
   });
 

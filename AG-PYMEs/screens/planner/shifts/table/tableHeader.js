@@ -86,14 +86,12 @@ const TableHeader = ({ selectedView, selectedDate, businessHours }) => {
             <View style={[styles.headerCell, styles.employeeHeader]}>
               <Text style={styles.headerText}>Empleado</Text>
             </View>
-
             <View style={[styles.headerCell, styles.timeInputHeader]}>
               <Text style={styles.headerText}>Horario</Text>
-            </View>
-
+            </View>{" "}
             {generateTimeSlots().map((time, index) => (
               <View
-                key={index}
+                key={`timeslot-header-${time.getTime()}-${index}`}
                 style={[styles.headerCell, styles.timeSlotHeader]}
               >
                 <Text style={styles.timeSlotText}>
