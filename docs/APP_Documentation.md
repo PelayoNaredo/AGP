@@ -39,10 +39,13 @@ La aplicación AG-PYMEs sigue una arquitectura de tres capas:
 
 #### Frontend (React Native/Expo)
 
-- **Navegación**: React Navigation v6
+- **React Native**: 0.79.2
+- **Expo**: 53.0.0
+- **React**: 19.0.0
+- **Navegación**: React Navigation 7.x
 - **Gestión de Estado**: Context API + Hooks
-- **HTTP Client**: Axios
-- **UI Components**: React Native Elements + Componentes Personalizados
+- **HTTP Client**: Axios 1.8.2
+- **UI Components**: React Native Paper 5.13.1 + Componentes Personalizados
 
 #### Backend (Node.js)
 

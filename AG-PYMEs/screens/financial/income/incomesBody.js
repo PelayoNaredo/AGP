@@ -254,7 +254,7 @@ const IncomePage = () => {
           onButtonPress={() => handleOpenModal()}
           buttonText="Nuevo Ingreso"
           buttonVariant="info"
-          buttonIconName="add-outline"
+          buttonIconName="add-circle-outline"
           searchPlaceholder="Buscar en comentarios..."
         />
         <View style={styles.monthSelector}>

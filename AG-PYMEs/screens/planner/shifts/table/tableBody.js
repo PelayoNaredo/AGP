@@ -113,7 +113,6 @@ const TableBody = ({
         color={themeObject.colors.primary}
       />
       <View style={styles.scheduleIntervals}>
-        {" "}
         {shifts[empleado.id_empleado]?.[dia]?.intervalos.map(
           (intervalo, index) => (
             <Text
@@ -224,7 +223,6 @@ const TableBody = ({
               onPress={() => onEditShift(empleado, diaIndex)}
               disabled={!empleado.activo}
             >
-              {" "}
               <View style={styles.intervalsContainer}>
                 {intervalos.map((intervalo, idx) => (
                   <View
@@ -284,7 +282,6 @@ const TableBody = ({
           overScrollMode="always"
           keyboardShouldPersistTaps="handled"
         >
-          {" "}
           <View style={[styles.timelineContainer, { width: businessWidth }]}>
             {renderTimelineBar(empleado.id_empleado)}
             {timeSlots.map((slot, index) => (

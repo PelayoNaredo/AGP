@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { View, StyleSheet } from "react-native";
+import Animated, {
+  FadeInRight,
+  FadeOutLeft,
+  FadeInUp,
+  Layout,
+} from "react-native-reanimated";
 import HeaderWithTabs from "../../components/HeaderWithTabs";
 import EmployeesBody from "./employee/employeesBody";
 import LeavesBody from "./leave/leavesBody";
@@ -51,35 +57,28 @@ const EmployeeScreen = () => {
   useEffect(() => {
     loadData();
   }, []);
-
   const handleEmployeeUpdate = () => {
     loadData(); // Recargar todos los datos cuando hay cambios
   };
+  const renderContent = () => {
+    const contentProps = {
+      entering: FadeInRight.duration(400).springify(),
+      exiting: FadeOutLeft.duration(300),
+      layout: Layout.springify(),
+      style: styles.contentView,
+    };
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: themeObject.colors.background,
-    },
-  });
-
-  return (
-    <View style={styles.container}>
-      <HeaderWithTabs
-        title="Empleados"
-        tabs={tabs}
-        activeView={activeView}
-        onChangeView={setActiveView}
-      />
-
-      {activeView === "employees" ? (
+    return activeView === "employees" ? (
+      <Animated.View key={activeView} {...contentProps}>
         <EmployeesBody
           employees={employees}
           loading={loading}
           error={error}
           onEmployeeUpdate={handleEmployeeUpdate}
         />
-      ) : (
+      </Animated.View>
+    ) : (
+      <Animated.View key={activeView} {...contentProps}>
         <LeavesBody
           employees={employees}
           leaves={leaves}
@@ -87,8 +86,34 @@ const EmployeeScreen = () => {
           error={error}
           onLeaveUpdate={handleEmployeeUpdate}
         />
-      )}
-    </View>
+      </Animated.View>
+    );
+  };
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: themeObject.colors.background,
+    },
+    contentView: {
+      flex: 1,
+    },
+  });
+  return (
+    <Animated.View
+      style={styles.container}
+      entering={FadeInUp.duration(600).springify()}
+    >
+      {/* Header sin animaciones */}
+      <HeaderWithTabs
+        title="Empleados"
+        tabs={tabs}
+        activeView={activeView}
+        onChangeView={setActiveView}
+      />
+
+      {renderContent()}
+    </Animated.View>
   );
 };
 

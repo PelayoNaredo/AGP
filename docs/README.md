@@ -1,8 +1,29 @@
 # AG-PYMEs - Sistema de Gestión Integral para Pequeñas y Medianas Empresas
 
-![AG-PYMEs Logo](../AG-PYMEs/assets/icon.png)
+![AG-PYMEs Logo](../AG-PYMEs/assets/logo.png)
 
 **AG-PYMEs** es una aplicación móvil multiplataforma desarrollada con React Native y Expo, diseñada específicamente para la gestión integral de pequeñas y medianas empresas. La aplicación proporciona herramientas completas para administrar ventas, inventario, empleados, finanzas, planificación y mucho más.
+
+## 📚 Documentación del Proyecto
+
+### 📋 Documentos Principales
+
+- **[Despliegue y Pruebas](Despliegue_y_Pruebas.md)** - Guía completa de instalación, configuración y pruebas funcionales
+- **[Diseño del Sistema](Diseño_AG-PYMEs.md)** - Arquitectura y diseño técnico
+- **[Casos de Uso](Diagrama_Casos_de_Uso_AG-PYMEs.md)** - Especificaciones funcionales
+- **[Documentación Técnica](APP_Documentation.md)** - Detalles de implementación
+
+### 🛠️ Scripts de Despliegue
+
+- `scripts/verify_system.ps1` - Verificación de prerrequisitos
+- `scripts/start_all.ps1` - Inicio automático del sistema
+- `scripts/run_tests.ps1` - Ejecución de pruebas básicas
+
+### 🧪 Pruebas
+
+- `tests/casos_prueba_detallados.md` - Casos de prueba exhaustivos
+- **80 casos de prueba** ejecutados con **100% de éxito**
+- Pruebas de caja negra en múltiples plataformas
 
 ## 🚀 Características Principales
 

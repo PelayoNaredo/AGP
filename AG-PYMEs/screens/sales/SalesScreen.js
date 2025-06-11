@@ -1,5 +1,11 @@
 import React, { useState } from "react";
 import { View, StyleSheet } from "react-native";
+import Animated, {
+  FadeInRight,
+  FadeOutLeft,
+  FadeInUp,
+  Layout,
+} from "react-native-reanimated";
 import { useTheme } from "../../context/ThemeContext";
 import HeaderWithTabs from "../../components/HeaderWithTabs";
 import SalesPointScreen from "./salesPoint/SalesPointScreen";
@@ -39,7 +45,62 @@ const SalesScreen = () => {
       inactiveIcon: "construct-outline",
     },
   ];
+  const renderContent = () => {
+    const contentProps = {
+      entering: FadeInRight.duration(400).springify(),
+      exiting: FadeOutLeft.duration(300),
+      layout: Layout.springify(),
+    };
 
+    switch (activeView) {
+      case "punto-venta":
+        return (
+          <Animated.View
+            key={activeView}
+            style={styles.contentView}
+            {...contentProps}
+          >
+            <SalesPointScreen />
+          </Animated.View>
+        );
+      case "historial":
+        return (
+          <Animated.View
+            key={activeView}
+            style={styles.contentView}
+            {...contentProps}
+          >
+            <SalesHistoryScreen />
+          </Animated.View>
+        );
+      case "clientes":
+        return (
+          <Animated.View
+            key={activeView}
+            style={styles.contentView}
+            {...contentProps}
+          >
+            <ClientsScreen />
+          </Animated.View>
+        );
+      case "servicios":
+        return (
+          <Animated.View
+            key={activeView}
+            style={styles.contentView}
+            {...contentProps}
+          >
+            <ServicesScreen />
+          </Animated.View>
+        );
+      default:
+        return (
+          <Animated.View style={styles.contentView} {...contentProps}>
+            <SalesPointScreen />
+          </Animated.View>
+        );
+    }
+  };
   return (
     <View
       style={[
@@ -47,18 +108,19 @@ const SalesScreen = () => {
         { backgroundColor: themeObject.colors.background },
       ]}
     >
-      <View style={styles.content}>
+      <Animated.View
+        style={styles.content}
+        entering={FadeInUp.duration(600).springify()}
+      >
+        {/* Header sin animaciones */}
         <HeaderWithTabs
           title="Ventas"
           tabs={tabs}
           activeView={activeView}
           onChangeView={setActiveView}
         />
-        {activeView === "punto-venta" && <SalesPointScreen />}
-        {activeView === "historial" && <SalesHistoryScreen />}
-        {activeView === "clientes" && <ClientsScreen />}
-        {activeView === "servicios" && <ServicesScreen />}
-      </View>
+        {renderContent()}
+      </Animated.View>
     </View>
   );
 };
@@ -68,6 +130,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    flex: 1,
+  },
+  contentView: {
     flex: 1,
   },
 });

@@ -9,10 +9,16 @@ import {
   ScrollView,
   KeyboardAvoidingView,
 } from "react-native";
+import Animated, {
+  FadeInDown,
+  FadeInUp,
+  FadeInRight,
+  Layout,
+  SlideInRight,
+} from "react-native-reanimated";
 import { useTheme } from "../../../context/ThemeContext";
 import { SegmentedButtons, Snackbar } from "react-native-paper";
 import { useNavigation } from "@react-navigation/native";
-import { Services } from "../../../api";
 import BluetoothPrinterManager from "./components/BluetoothPrinterManager";
 import BluetoothPrinterService from "./services/BluetoothPrinterService";
 
@@ -212,123 +218,133 @@ const SalesPointScreen = () => {
     },
   });
   return (
-    <KeyboardAvoidingView
+    <Animated.View
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      entering={FadeInUp.duration(600).springify()}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={true}
-        nestedScrollEnabled={true}
-        bounces={Platform.OS === "ios"}
-        overScrollMode={Platform.OS === "android" ? "never" : undefined}
-        persistentScrollbar={Platform.OS === "android"}
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
-        <View style={styles.mainContent}>
-          <View style={styles.gridContainer}>
-            {/* Columna izquierda */}
-            <View style={styles.leftColumn}>
-              <ClientSelector
-                client={selectedClient}
-                onSelectClient={() => {
-                  setNewClientMode(false);
-                  setIsClientModalVisible(true);
-                }}
-                onAddNewClient={() => {
-                  setNewClientMode(true);
-                  setIsClientModalVisible(true);
-                }}
-              />
-
-              <View style={styles.segmentContainer}>
-                <SegmentedButtons
-                  value={activeSegment}
-                  onValueChange={setActiveSegment}
-                  buttons={[
-                    {
-                      value: "productos",
-                      label: "Productos",
-                      icon: "package-variant-closed",
-                      checkedColor: themeObject.colors.primary,
-                      style: { backgroundColor: themeObject.colors.surface },
-                    },
-                    {
-                      value: "servicios",
-                      label: "Servicios",
-                      icon: "tools",
-                      checkedColor: themeObject.colors.primary,
-                      style: { backgroundColor: themeObject.colors.surface },
-                    },
-                  ]}
-                  style={{ backgroundColor: themeObject.colors.surface }}
-                />
-              </View>
-
-              {activeSegment === "productos" ? (
-                <ProductSelector onSelectProduct={cart.addProduct} />
-              ) : (
-                <ServiceSelector onSelectService={cart.addService} />
-              )}
-            </View>
-
-            {/* Columna derecha */}
-            <View style={styles.rightColumn}>
-              <CartComponent
-                cart={cart}
-                onPayment={() =>
-                  cart.isEmpty
-                    ? Alert.alert("Error", "El carrito está vacío")
-                    : setIsPaymentModalVisible(true)
-                }
-                isLoading={saleProcessor.isLoading}
-                printerComponent={
-                  <BluetoothPrinterManager
-                    onPrinterStatusChange={handlePrinterStatusChange}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={true}
+          nestedScrollEnabled={true}
+          bounces={Platform.OS === "ios"}
+          overScrollMode={Platform.OS === "android" ? "never" : undefined}
+          persistentScrollbar={Platform.OS === "android"}
+        >
+          <View style={styles.mainContent}>
+            <View style={styles.gridContainer}>
+              {/* Columna izquierda */}
+              <Animated.View
+                style={styles.leftColumn}
+                entering={FadeInDown.delay(200).duration(500).springify()}
+              >
+                <Animated.View
+                  entering={SlideInRight.delay(300).duration(400).springify()}
+                >
+                  <ClientSelector
+                    client={selectedClient}
+                    onSelectClient={() => {
+                      setNewClientMode(false);
+                      setIsClientModalVisible(true);
+                    }}
+                    onAddNewClient={() => {
+                      setNewClientMode(true);
+                      setIsClientModalVisible(true);
+                    }}
                   />
-                }
-              />
+                </Animated.View>
+
+                <Animated.View
+                  style={styles.segmentContainer}
+                  entering={FadeInRight.delay(400).duration(500).springify()}
+                >
+                  <SegmentedButtons
+                    value={activeSegment}
+                    onValueChange={setActiveSegment}
+                    buttons={[
+                      {
+                        value: "productos",
+                        label: "Productos",
+                        icon: "package-variant-closed",
+                        checkedColor: themeObject.colors.primary,
+                        style: { backgroundColor: themeObject.colors.surface },
+                      },
+                      {
+                        value: "servicios",
+                        label: "Servicios",
+                        icon: "tools",
+                        checkedColor: themeObject.colors.primary,
+                        style: { backgroundColor: themeObject.colors.surface },
+                      },
+                    ]}
+                    style={{ backgroundColor: themeObject.colors.surface }}
+                  />
+                </Animated.View>
+
+                <Animated.View
+                  entering={FadeInUp.delay(500).duration(600).springify()}
+                  key={activeSegment}
+                  layout={Layout.springify()}
+                >
+                  {activeSegment === "productos" ? (
+                    <ProductSelector onSelectProduct={cart.addProduct} />
+                  ) : (
+                    <ServiceSelector onSelectService={cart.addService} />
+                  )}
+                </Animated.View>
+              </Animated.View>
+
+              {/* Columna derecha */}
+              <Animated.View
+                style={styles.rightColumn}
+                entering={FadeInDown.delay(600).duration(500).springify()}
+              >
+                <CartComponent
+                  cart={cart}
+                  onPayment={() =>
+                    cart.isEmpty
+                      ? Alert.alert("Error", "El carrito está vacío")
+                      : setIsPaymentModalVisible(true)
+                  }
+                  isLoading={saleProcessor.isLoading}
+                  printerComponent={
+                    <BluetoothPrinterManager
+                      onPrinterStatusChange={handlePrinterStatusChange}
+                    />
+                  }
+                />
+              </Animated.View>
             </View>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
 
-      {/* Modales y Snackbar fuera del ScrollView */}
-      <SaleModal
-        visible={isPaymentModalVisible}
-        onClose={() => setIsPaymentModalVisible(false)}
-        cartItems={cart.cartItems}
-        client={selectedClient}
-        subtotal={cart.calculateSubtotal()}
-        tax={cart.calculateTax()}
-        total={cart.calculateTotal()}
-        onConfirm={saleProcessor.processSale}
-      />
-      <ClientModal
-        visible={isClientModalVisible}
-        onClose={() => {
-          setIsClientModalVisible(false);
-          setNewClientMode(false);
-        }}
-        onSelectClient={setSelectedClient}
-        showNewClientForm={newClientMode}
-      />
-      <Snackbar
-        visible={notification.snackbarVisible}
-        onDismiss={notification.hideSnackbar}
-        duration={3000}
-        style={{ backgroundColor: themeObject.colors.surface }}
-        action={{
-          label: "OK",
-          onPress: notification.hideSnackbar,
-        }}
-      >
-        <Text style={{ color: themeObject.colors.text }}>
-          {notification.snackbarMessage}
-        </Text>
-      </Snackbar>
-    </KeyboardAvoidingView>
+        {/* Modales y Snackbar fuera del ScrollView */}
+        <SaleModal
+          visible={isPaymentModalVisible}
+          onClose={() => setIsPaymentModalVisible(false)}
+          cartItems={cart.cartItems}
+          client={selectedClient}
+          subtotal={cart.calculateSubtotal()}
+          tax={cart.calculateTax()}
+          total={cart.calculateTotal()}
+          onConfirm={saleProcessor.processSale}
+        />
+        <ClientModal
+          visible={isClientModalVisible}
+          onClose={() => {
+            setIsClientModalVisible(false);
+            setNewClientMode(false);
+          }}
+          onSelectClient={setSelectedClient}
+          showNewClientForm={newClientMode}
+        />
+      </KeyboardAvoidingView>
+    </Animated.View>
   );
 };
 

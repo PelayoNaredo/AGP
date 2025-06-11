@@ -7,8 +7,14 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
+  withTiming,
+  interpolate,
+  Extrapolate,
+  runOnJS,
+  Easing,
 } from "react-native-reanimated";
 import { useTheme } from "../context/ThemeContext";
+import { ANIMATION_CONFIGS, TIMING_CONFIGS } from "../components/animations";
 
 // Screens
 import HomeScreen from "../screens/home/HomeScreen";
@@ -37,13 +43,42 @@ const AnimatedTabIcon = ({
   iconColor,
   theme,
 }) => {
-  const iconStyle = useAnimatedStyle(() => {
-    const scale =
-      activeIndex.value === index
-        ? withSpring(1.2, { damping: 10, stiffness: 150 })
-        : withSpring(1, { damping: 10, stiffness: 150 });
+  const scale = useSharedValue(1);
+  const rotation = useSharedValue(0);
+  const opacity = useSharedValue(isFocused ? 1 : 0.7);
 
-    return { transform: [{ scale }] };
+  React.useEffect(() => {
+    if (activeIndex.value === index) {
+      scale.value = withSpring(1.3, TIMING_CONFIGS.spring.spring);
+      rotation.value = withSpring(360, {
+        ...TIMING_CONFIGS.spring.spring,
+        duration: 600,
+      });
+      opacity.value = withTiming(1, TIMING_CONFIGS.timing.medium);
+    } else {
+      scale.value = withSpring(1, TIMING_CONFIGS.spring.quickSpring);
+      rotation.value = withTiming(0, TIMING_CONFIGS.timing.fast);
+      opacity.value = withTiming(0.7, TIMING_CONFIGS.timing.fast);
+    }
+  }, [activeIndex.value, index]);
+
+  const iconStyle = useAnimatedStyle(() => {
+    const isActive = activeIndex.value === index;
+
+    return {
+      transform: [
+        { scale: scale.value },
+        {
+          rotate: `${interpolate(
+            rotation.value,
+            [0, 360],
+            [0, 360],
+            Extrapolate.CLAMP
+          )}deg`,
+        },
+      ],
+      opacity: opacity.value,
+    };
   });
 
   return (
@@ -56,11 +91,20 @@ const AnimatedTabIcon = ({
 const CustomTabBar = ({ state, descriptors, navigation }) => {
   const { themeObject } = useTheme();
   const activeIndex = useSharedValue(state.index);
-
+  const indicatorScale = useSharedValue(1);
+  const indicatorOpacity = useSharedValue(1);
   // Sincronizar activeIndex con state.index cuando cambie
   React.useEffect(() => {
     if (activeIndex.value !== state.index) {
-      activeIndex.value = state.index;
+      // Animación del indicador durante el cambio
+      indicatorScale.value = withSpring(0.8, TIMING_CONFIGS.spring.quickSpring);
+      indicatorOpacity.value = withTiming(0.7, TIMING_CONFIGS.timing.fast);
+
+      setTimeout(() => {
+        activeIndex.value = state.index;
+        indicatorScale.value = withSpring(1, TIMING_CONFIGS.spring.spring);
+        indicatorOpacity.value = withTiming(1, TIMING_CONFIGS.timing.medium);
+      }, 50);
     }
   }, [state.index]);
 
@@ -72,8 +116,13 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
     });
 
     if (!event.defaultPrevented && state.index !== index) {
-      activeIndex.value = index;
-      navigation.navigate(route.name);
+      // Animación de press
+      indicatorScale.value = withSpring(0.9, TIMING_CONFIGS.spring.quickSpring);
+
+      setTimeout(() => {
+        activeIndex.value = index;
+        navigation.navigate(route.name);
+      }, 50);
     }
   };
 
@@ -83,10 +132,22 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
 
     return {
       transform: [
-        { translateX: withSpring(translateX, { damping: 15, stiffness: 120 }) },
+        {
+          translateX: withSpring(translateX, {
+            ...TIMING_CONFIGS.spring.spring,
+            damping: 18,
+            stiffness: 140,
+          }),
+        },
+        { scale: indicatorScale.value },
       ],
       backgroundColor: themeObject.colors.primary,
-      color: themeObject.colors.buttonWhite,
+      opacity: indicatorOpacity.value,
+      shadowColor: themeObject.colors.primary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 4,
+      elevation: 5,
     };
   });
 
@@ -130,15 +191,15 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
             iconName = isFocused ? "wallet" : "wallet-outline";
             break;
         }
-
         return (
           <Pressable
             key={route.key}
             onPress={() => handlePress(index, route)}
             style={styles.tabButton}
             android_ripple={{
-              color: themeObject.colors.primary + "20",
+              color: themeObject.colors.primary + "30",
               borderless: true,
+              radius: 25,
             }}
           >
             <AnimatedTabIcon
@@ -180,6 +241,12 @@ const AppStack = () => {
     <Stack.Navigator
       screenOptions={{
         header: (props) => <Header {...props} />,
+        headerStyle: {
+          height: 80,
+        },
+        cardStyle: {
+          paddingTop: 0, // Eliminar padding superior de las pantallas
+        },
       }}
     >
       <Stack.Screen
@@ -194,15 +261,26 @@ const AppStack = () => {
         component={SettingsScreen}
         options={{
           headerShown: true,
-          title: " ",
+          title: "Configuración",
+          headerStyle: {
+            height: 40, // Reducir altura del header
+            elevation: 0, // Sin sombra en Android
+            shadowOpacity: 0, // Sin sombra en iOS
+          },
+          headerTitleStyle: {
+            fontSize: 18,
+            fontWeight: "600",
+          },
+          headerTitleContainerStyle: {
+            paddingTop: 0,
+          },
         }}
       />
       <Stack.Screen
         name="Alerts"
         component={AlertsScreen}
         options={{
-          headerShown: true,
-          title: " ",
+          headerShown: false,
         }}
       />
     </Stack.Navigator>

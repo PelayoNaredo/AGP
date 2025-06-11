@@ -1,5 +1,11 @@
 import React, { useState } from "react";
 import { View, StyleSheet } from "react-native";
+import Animated, {
+  FadeInRight,
+  FadeOutLeft,
+  FadeInUp,
+  Layout,
+} from "react-native-reanimated";
 import { useTheme } from "../../context/ThemeContext";
 import HeaderWithTabs from "../../components/HeaderWithTabs";
 import ProductsScreen from "./product/productsScreen";
@@ -24,7 +30,24 @@ const InventoryScreen = () => {
       inactiveIcon: "boat-outline",
     },
   ];
+  const renderContent = () => {
+    const contentProps = {
+      entering: FadeInRight.duration(400).springify(),
+      exiting: FadeOutLeft.duration(300),
+      layout: Layout.springify(),
+      style: styles.contentView,
+    };
 
+    return activeView === "productos" ? (
+      <Animated.View key={activeView} {...contentProps}>
+        <ProductsScreen />
+      </Animated.View>
+    ) : (
+      <Animated.View key={activeView} {...contentProps}>
+        <OrdersScreen />
+      </Animated.View>
+    );
+  };
   return (
     <View
       style={[
@@ -32,15 +55,19 @@ const InventoryScreen = () => {
         { backgroundColor: themeObject.colors.background },
       ]}
     >
-      <View style={styles.content}>
+      <Animated.View
+        style={styles.content}
+        entering={FadeInUp.duration(600).springify()}
+      >
+        {/* Header sin animaciones */}
         <HeaderWithTabs
           title="Inventario"
           tabs={tabs}
           activeView={activeView}
           onChangeView={setActiveView}
         />
-        {activeView === "productos" ? <ProductsScreen /> : <OrdersScreen />}
-      </View>
+        {renderContent()}
+      </Animated.View>
     </View>
   );
 };
@@ -50,6 +77,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    flex: 1,
+  },
+  contentView: {
     flex: 1,
   },
 });

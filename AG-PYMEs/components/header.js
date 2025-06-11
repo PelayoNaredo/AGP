@@ -1,29 +1,18 @@
 import React, { useState, useEffect, useCallback } from "react";
-import {
-  Text,
-  View,
-  StyleSheet,
-  Pressable,
-  Modal,
-  Platform,
-} from "react-native";
+import { Text, View, StyleSheet, Pressable, Platform } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { Services } from "../api";
-import { useAuth } from "../context/AuthContext";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import LogoImage from "./LogoImage";
 
 const CustomHeader = ({ navigation: navProp, route, options, back }) => {
   const { theme, themeObject } = useTheme();
-  const { logout } = useAuth();
   const navigation = useNavigation();
   const [localTitle, setLocalTitle] = useState("");
   const [localLogo, setLocalLogo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [showMenu, setShowMenu] = useState(false);
-  const [menuDisabled, setMenuDisabled] = useState(false);
-
+  const [pendingAlertsCount, setPendingAlertsCount] = useState(0);
   const isSettingsScreen = route?.name === "Settings";
   const isAlertsScreen = route?.name === "Alerts";
   const nav = navProp || navigation;
@@ -48,125 +37,111 @@ const CustomHeader = ({ navigation: navProp, route, options, back }) => {
     }
   }, []);
 
+  const fetchPendingAlerts = useCallback(async () => {
+    try {
+      const alerts = await Services.Data.Alerts.getAll();
+      const pendingCount = alerts.filter(
+        (alert) => alert.estado === "pendiente"
+      ).length;
+      setPendingAlertsCount(pendingCount);
+    } catch (error) {
+      console.error("[Header] Error al obtener alertas:", error);
+      setPendingAlertsCount(0);
+    }
+  }, []);
   useEffect(() => {
     fetchSettings();
-  }, [fetchSettings]);
+    fetchPendingAlerts();
+  }, [fetchSettings, fetchPendingAlerts]);
 
-  const handleLogoPress = () => {
-    if (!menuDisabled) {
-      setShowMenu(true);
-    }
-  };
-
-  const handleLogout = async () => {
-    setShowMenu(false);
-    await logout();
-  };
+  // Actualizar alertas cuando el componente esté enfocado
+  useFocusEffect(
+    useCallback(() => {
+      fetchPendingAlerts();
+    }, [fetchPendingAlerts])
+  );
 
   const handleSettings = () => {
-    setShowMenu(false);
     if (nav?.navigate) {
       nav.navigate("Settings");
     }
   };
-
   const handleAlerts = () => {
-    setShowMenu(false);
     if (nav?.navigate) {
       nav.navigate("Alerts");
     }
   };
-
   return (
     <View
       style={[
         styles.container,
         { backgroundColor: themeObject.colors.background },
-        { paddingTop: Platform.OS === "android" ? 30 : 24 },
+        {
+          paddingTop: Platform.OS === "android" ? 45 : 40,
+          paddingBottom: Platform.OS === "android" ? 4 : 16,
+        },
       ]}
     >
-      {back && (
-        <Icon
-          name="arrow-left"
-          size={24}
-          color={themeObject.colors.text}
-          onPress={() => nav?.goBack?.()}
-          style={styles.backButton}
-        />
-      )}
-
-      {!isLoading && (
-        <Text style={[styles.title, { color: themeObject.colors.text }]}>
-          {options?.title || localTitle}
-        </Text>
-      )}
-
-      {!isSettingsScreen && !isAlertsScreen && (
-        <Pressable
-          style={[
-            styles.imageContainer,
-            { backgroundColor: themeObject.colors.surface },
-            menuDisabled && styles.imageContainerDisabled,
-          ]}
-          onPress={handleLogoPress}
-          disabled={menuDisabled}
-        >
-          <LogoImage
-            logoUrl={localLogo}
-            size={40}
-            containerStyle={styles.logoContainer}
-          />
-        </Pressable>
-      )}
-
-      {!isSettingsScreen && !isAlertsScreen && (
-        <Modal
-          visible={showMenu}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowMenu(false)}
-        >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setShowMenu(false)}
+      {/* Lado izquierdo - Logo + Título */}
+      <View style={styles.leftSection}>
+        {back && (
+          <Pressable onPress={() => nav?.goBack?.()} style={styles.backButton}>
+            <Icon name="arrow-left" size={24} color={themeObject.colors.text} />
+          </Pressable>
+        )}
+        {!back && (
+          <View
+            style={[
+              styles.logoContainer,
+              { backgroundColor: themeObject.colors.surface },
+            ]}
           >
-            <View
-              style={[
-                styles.menuContainer,
-                { backgroundColor: themeObject.colors.surface },
-              ]}
-            >
-              <Pressable style={styles.menuItem} onPress={handleAlerts}>
-                <Icon
-                  name="bell-outline"
-                  size={24}
-                  color={themeObject.colors.text}
-                />
-                <Text
-                  style={[styles.menuText, { color: themeObject.colors.text }]}
+            <LogoImage
+              logoUrl={localLogo}
+              size={32}
+              containerStyle={styles.logoImageContainer}
+            />
+          </View>
+        )}
+        {!isLoading && (
+          <Text style={[styles.title, { color: themeObject.colors.text }]}>
+            {options?.title || localTitle}
+          </Text>
+        )}
+      </View>
+      {/* Lado derecho - Iconos de acción */}
+      {!isSettingsScreen && !isAlertsScreen && !back && (
+        <View style={styles.rightSection}>
+          <Pressable style={styles.iconButton} onPress={handleAlerts}>
+            <View style={styles.alertIconContainer}>
+              <Icon
+                name="bell-outline"
+                size={24}
+                color={themeObject.colors.text}
+              />
+              {pendingAlertsCount > 0 && (
+                <View
+                  style={[
+                    styles.alertBadge,
+                    { backgroundColor: themeObject.colors.error },
+                  ]}
                 >
-                  Alertas
-                </Text>
-              </Pressable>
-              <Pressable style={styles.menuItem} onPress={handleSettings}>
-                <Icon name="cog" size={24} color={themeObject.colors.text} />
-                <Text
-                  style={[styles.menuText, { color: themeObject.colors.text }]}
-                >
-                  Configuración
-                </Text>
-              </Pressable>
-              <Pressable style={styles.menuItem} onPress={handleLogout}>
-                <Icon name="logout" size={24} color={themeObject.colors.text} />
-                <Text
-                  style={[styles.menuText, { color: themeObject.colors.text }]}
-                >
-                  Cerrar sesión
-                </Text>
-              </Pressable>
+                  <Text style={styles.alertBadgeText}>
+                    {pendingAlertsCount > 99 ? "99+" : pendingAlertsCount}
+                  </Text>
+                </View>
+              )}
             </View>
           </Pressable>
-        </Modal>
+
+          <Pressable style={styles.iconButton} onPress={handleSettings}>
+            <Icon
+              name="cog-outline"
+              size={24}
+              color={themeObject.colors.text}
+            />
+          </Pressable>
+        </View>
       )}
     </View>
   );
@@ -181,64 +156,66 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     zIndex: 10,
   },
+  leftSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  rightSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
   backButton: {
     padding: 8,
     marginRight: 8,
+  },
+  logoContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+    marginRight: 12,
+  },
+  logoImageContainer: {
+    borderWidth: 0,
   },
   title: {
     fontSize: 20,
     fontWeight: "800",
     letterSpacing: 0.5,
-    flex: 1,
-    left: 18,
-    textAlign: "center",
-    marginHorizontal: 12,
     fontVariant: "small-caps",
+    color: "#2196F3",
   },
-  imageContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-
-    justifyContent: "center",
-    alignItems: "center",
-    overflow: "hidden",
-  },
-  logoContainer: {
-    borderWidth: 0,
-  },
-  profilePlaceholder: {
-    opacity: 0.8,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  menuContainer: {
-    position: "absolute",
-    top: 60,
-    right: 20,
-    borderRadius: 8,
+  iconButton: {
     padding: 8,
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  menuItem: {
-    flexDirection: "row",
+    borderRadius: 20,
+    justifyContent: "center",
     alignItems: "center",
-    padding: 12,
-    gap: 8,
   },
-  menuText: {
-    fontSize: 16,
+  alertIconContainer: {
+    position: "relative",
   },
-  imageContainerDisabled: {
-    opacity: 0.7,
+  alertBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+  alertBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
+    textAlign: "center",
+    lineHeight: 12,
   },
 });
 

@@ -191,7 +191,7 @@ const ShiftModal = ({
             items={diasSemana}
             placeholder="Seleccione un día"
           />
-        </View>{" "}
+        </View>
         <View style={styles.intervalsContainer}>
           <Text style={styles.label}>Intervalos de Trabajo *</Text>
           {formData.intervalos.map((interval, index) => (
@@ -213,7 +213,7 @@ const ShiftModal = ({
                 />
               </Pressable>
             </View>
-          ))}{" "}
+          ))}
           {timeEntries.map((entry, index) => (
             <View
               key={`time-entry-${entry.start || "empty"}-${entry.end || "empty"}-${index}`}
@@ -268,7 +268,7 @@ const ShiftModal = ({
             </CustomButton>
           )}
         </View>
-      </ScrollView>{" "}
+      </ScrollView>
       <TimeSelector
         visible={showTimeSelector.index !== -1}
         onClose={() => setShowTimeSelector({ index: -1, type: null })}

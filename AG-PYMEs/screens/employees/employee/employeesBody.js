@@ -405,7 +405,7 @@ const EmployeesBody = ({ onEmployeeUpdate }) => {
         setSearchQuery={setSearchQuery}
         onButtonPress={() => setIsModalVisible(true)}
         buttonText="Nuevo Empleado"
-        buttonIconName="add-outline"
+        buttonIconName="add-circle-outline"
         buttonVariant="info"
         searchPlaceholder="Buscar (DNI, Nombre, etc.)..."
       />

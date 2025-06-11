@@ -1,6 +1,23 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, FlatList, RefreshControl } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  FlatList,
+  RefreshControl,
+  Pressable,
+} from "react-native";
+import Animated, {
+  FadeInDown,
+  FadeInUp,
+  Layout,
+  SlideOutLeft,
+  ZoomIn,
+} from "react-native-reanimated";
 import { useTheme } from "../../context/ThemeContext";
+import { useNavigation } from "@react-navigation/native";
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import AlertCard from "./AlertCard";
 import AlertFilter from "./AlertFilter";
 import AlertModal from "./alertModal";
@@ -9,6 +26,7 @@ import { Services } from "../../api/index";
 
 const AlertsScreen = () => {
   const { themeObject } = useTheme();
+  const navigation = useNavigation();
   const [alerts, setAlerts] = useState([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingAlert, setEditingAlert] = useState(null);
@@ -86,15 +104,23 @@ const AlertsScreen = () => {
     }
   };
 
-  const renderAlertItem = ({ item }) => (
-    <AlertCard
-      alert={item}
-      onPress={() => {
-        setEditingAlert(item);
-        setShowCreateForm(true);
-      }}
-      onComplete={() => handleCompleteAlert(item.id_recordatorio)}
-    />
+  const renderAlertItem = ({ item, index }) => (
+    <Animated.View
+      entering={FadeInDown.delay(index * 100)
+        .duration(500)
+        .springify()}
+      exiting={SlideOutLeft.duration(300)}
+      layout={Layout.springify()}
+    >
+      <AlertCard
+        alert={item}
+        onPress={() => {
+          setEditingAlert(item);
+          setShowCreateForm(true);
+        }}
+        onComplete={() => handleCompleteAlert(item.id_recordatorio)}
+      />
+    </Animated.View>
   );
 
   return (
@@ -104,10 +130,23 @@ const AlertsScreen = () => {
         { backgroundColor: themeObject.colors.background },
       ]}
     >
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: themeObject.colors.text }]}>
-          Alertas
-        </Text>
+      {" "}
+      <Animated.View
+        style={styles.header}
+        entering={FadeInUp.duration(600).springify()}
+      >
+        <View style={styles.leftSection}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Icon name="arrow-left" size={24} color={themeObject.colors.text} />
+          </Pressable>
+          <Text style={[styles.title, { color: themeObject.colors.text }]}>
+            Alertas
+          </Text>
+        </View>
+        {/* Botón sin animaciones */}
         <CustomButton
           variant="primary"
           size="sm"
@@ -116,29 +155,37 @@ const AlertsScreen = () => {
         >
           Nueva Alerta
         </CustomButton>
-      </View>
-
-      <AlertFilter filters={filters} onFilterChange={handleFilterChange} />
-
-      <FlatList
-        data={filteredAlerts}
-        keyExtractor={(item) => item.id_recordatorio.toString()}
-        renderItem={renderAlertItem}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text
-              style={[styles.emptyText, { color: themeObject.colors.text }]}
-            >
-              No hay alertas para mostrar
-            </Text>
-          </View>
-        }
-      />
-
+      </Animated.View>
+      <ScrollView>
+        <Animated.View
+          entering={FadeInDown.delay(300).duration(500).springify()}
+        >
+          <AlertFilter filters={filters} onFilterChange={handleFilterChange} />
+        </Animated.View>
+        <Animated.View entering={FadeInUp.delay(400).duration(700).springify()}>
+          <FlatList
+            data={filteredAlerts}
+            keyExtractor={(item) => item.id_recordatorio.toString()}
+            renderItem={renderAlertItem}
+            contentContainerStyle={styles.listContent}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            ListEmptyComponent={
+              <Animated.View
+                style={styles.emptyContainer}
+                entering={ZoomIn.delay(500).duration(600).springify()}
+              >
+                <Text
+                  style={[styles.emptyText, { color: themeObject.colors.text }]}
+                >
+                  No hay alertas para mostrar
+                </Text>
+              </Animated.View>
+            }
+          />
+        </Animated.View>
+      </ScrollView>
       <AlertModal
         visible={showCreateForm}
         initialData={editingAlert}
@@ -161,6 +208,15 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     padding: 16,
+  },
+  leftSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  backButton: {
+    padding: 8,
+    marginRight: 12,
   },
   title: {
     fontSize: 24,

@@ -1,7 +1,8 @@
-import React from "react";
-import { View, Text, StyleSheet, Platform } from "react-native";
+import React, { useState } from "react";
+import { View, Text, StyleSheet, Platform, Dimensions } from "react-native";
 import { useTheme } from "../../../context/ThemeContext";
 import CustomButton from "../../../components/customButton";
+import PopupMenu, { MenuItem } from "../../../components/popupMenu";
 
 // Formato de fecha para mostrar
 const formatDate = (date) => {
@@ -29,6 +30,9 @@ const AppointmentHeader = ({
   onCreateAppointment,
 }) => {
   const { themeObject } = useTheme();
+  const [showViewMenu, setShowViewMenu] = useState(false);
+  const { width } = Dimensions.get("window");
+  const isMobile = Platform.OS !== "web" || width < 768;
 
   // Función para obtener la fecha anterior según la vista
   const getPreviousDate = () => {
@@ -64,6 +68,25 @@ const AppointmentHeader = ({
   const goToToday = () => {
     onDateChange(new Date());
   };
+  // Función para manejar el cambio de vista desde el popup
+  const handleViewChange = (view) => {
+    onViewChange(view);
+    setShowViewMenu(false);
+  };
+
+  // Función para obtener el label de la vista actual
+  const getViewLabel = () => {
+    switch (selectedView) {
+      case "día":
+        return "Día";
+      case "semana":
+        return "Semana";
+      case "mes":
+        return "Mes";
+      default:
+        return "Vista";
+    }
+  };
 
   return (
     <View
@@ -76,6 +99,16 @@ const AppointmentHeader = ({
         <Text style={[styles.title, { color: themeObject.colors.text }]}>
           Agenda de Citas
         </Text>
+        <CustomButton
+          ionIconLeft="add-circle-outline"
+          variant="info"
+          onPress={onCreateAppointment}
+          style={styles.addButton}
+          size="sm"
+          compact={true}
+        >
+          Nueva Cita
+        </CustomButton>
       </View>
 
       <View style={styles.actionsContainer}>
@@ -117,54 +150,87 @@ const AppointmentHeader = ({
           >
             Hoy
           </CustomButton>
-        </View>
 
-        <View style={styles.viewSelectorContainer}>
-          <CustomButton
-            onPress={() => onViewChange("día")}
-            variant={selectedView === "día" ? "primary" : "secondary"}
-            compact={true}
-            size="sm"
-            style={styles.viewButton}
-          >
-            Día
-          </CustomButton>
+          {isMobile ? (
+            <PopupMenu
+              visible={showViewMenu}
+              onDismiss={() => setShowViewMenu(false)}
+              anchor={
+                <CustomButton
+                  onPress={() => setShowViewMenu(true)}
+                  variant="secondary"
+                  compact={true}
+                  size="sm"
+                  ionIconLeft="apps-outline"
+                  style={styles.viewMenuButton}
+                >
+                  {getViewLabel()}
+                </CustomButton>
+              }
+            >
+              <MenuItem
+                title="Día"
+                leadingIcon={selectedView === "día" ? "checkmark" : undefined}
+                onPress={() => handleViewChange("día")}
+              />
+              <MenuItem
+                title="Semana"
+                leadingIcon={
+                  selectedView === "semana" ? "checkmark" : undefined
+                }
+                onPress={() => handleViewChange("semana")}
+              />
+              <MenuItem
+                title="Mes"
+                leadingIcon={selectedView === "mes" ? "checkmark" : undefined}
+                onPress={() => handleViewChange("mes")}
+              />
+            </PopupMenu>
+          ) : (
+            <View style={styles.viewSelectorContainer}>
+              <CustomButton
+                onPress={() => onViewChange("día")}
+                variant={selectedView === "día" ? "primary" : "secondary"}
+                compact={true}
+                size="sm"
+                style={styles.viewButton}
+              >
+                Día
+              </CustomButton>
 
-          <CustomButton
-            onPress={() => onViewChange("semana")}
-            variant={selectedView === "semana" ? "primary" : "secondary"}
-            compact={true}
-            size="sm"
-            style={styles.viewButton}
-          >
-            Semana
-          </CustomButton>
+              <CustomButton
+                onPress={() => onViewChange("semana")}
+                variant={selectedView === "semana" ? "primary" : "secondary"}
+                compact={true}
+                size="sm"
+                style={styles.viewButton}
+              >
+                Semana
+              </CustomButton>
 
-          <CustomButton
-            onPress={() => onViewChange("mes")}
-            variant={selectedView === "mes" ? "primary" : "secondary"}
-            compact={true}
-            size="sm"
-            style={styles.viewButton}
-          >
-            Mes
-          </CustomButton>
+              <CustomButton
+                onPress={() => onViewChange("mes")}
+                variant={selectedView === "mes" ? "primary" : "secondary"}
+                compact={true}
+                size="sm"
+                style={styles.viewButton}
+              >
+                Mes
+              </CustomButton>
+            </View>
+          )}
         </View>
       </View>
 
-      <View style={styles.currentDateContainer}>
-        <Text style={[styles.currentDate, { color: themeObject.colors.text }]}>
-          {formatDate(selectedDate)}
-        </Text>
-        <CustomButton
-          ionIconLeft="add-outline"
-          variant="accent"
-          onPress={onCreateAppointment}
-          style={styles.addButton}
-        >
-          Nueva Cita
-        </CustomButton>
-      </View>
+      {!isMobile && (
+        <View style={styles.currentDateContainer}>
+          <Text
+            style={[styles.currentDate, { color: themeObject.colors.text }]}
+          >
+            {formatDate(selectedDate)}
+          </Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -187,19 +253,20 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: "700",
+    flex: 1,
   },
   actionsContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     alignItems: "center",
     flexWrap: "wrap",
-    marginBottom: 12,
+    marginBottom: Platform.OS === "web" ? 12 : 0,
   },
   dateNavContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginRight: 16,
-    marginBottom: Platform.OS === "web" ? 0 : 8,
+    flex: 1,
+    flexWrap: "wrap",
   },
   navButton: {
     marginHorizontal: 2,
@@ -208,6 +275,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   todayButton: {
+    marginLeft: 8,
+  },
+  viewMenuButton: {
     marginLeft: 8,
   },
   viewSelectorContainer: {
@@ -219,7 +289,7 @@ const styles = StyleSheet.create({
   },
   currentDateContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     alignItems: "center",
   },
   currentDate: {

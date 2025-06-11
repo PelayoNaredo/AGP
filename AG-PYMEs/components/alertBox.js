@@ -97,34 +97,43 @@ const AlertBox = ({
 
     return estadoConfig[estado] || estadoConfig.pendiente;
   };
-
   React.useEffect(() => {
     // Reiniciamos los valores antes de animar
     opacity.value = 0;
-    translateY.value = -20;
-    scale.value = 0.95;
+    translateY.value = -30;
+    scale.value = 0.9;
 
-    // Iniciamos la animación después de un pequeño retraso
+    // Iniciamos la animación con secuencia mejorada
     setTimeout(() => {
+      // Animación de entrada más suave y natural
       opacity.value = withTiming(1, {
-        duration: 400,
-        easing: Easing.out(Easing.ease),
+        duration: 350,
+        easing: Easing.out(Easing.cubic),
       });
       translateY.value = withTiming(0, {
         duration: 400,
-        easing: Easing.out(Easing.ease),
+        easing: Easing.out(Easing.back(1.2)),
       });
       scale.value = withTiming(1, {
-        duration: 400,
-        easing: Easing.out(Easing.ease),
+        duration: 350,
+        easing: Easing.out(Easing.back(1.1)),
       });
-    }, 50);
+    }, 30);
 
     return () => {
-      // Animación de salida cuando se desmonta el componente
-      opacity.value = withTiming(0, { duration: 250 });
-      translateY.value = withTiming(-20, { duration: 250 });
-      scale.value = withTiming(0.95, { duration: 250 });
+      // Animación de salida más rápida y suave
+      opacity.value = withTiming(0, {
+        duration: 200,
+        easing: Easing.in(Easing.ease),
+      });
+      translateY.value = withTiming(-15, {
+        duration: 200,
+        easing: Easing.in(Easing.ease),
+      });
+      scale.value = withTiming(0.95, {
+        duration: 200,
+        easing: Easing.in(Easing.ease),
+      });
     };
   }, [message, type]);
   const animatedStyles = useAnimatedStyle(() => ({

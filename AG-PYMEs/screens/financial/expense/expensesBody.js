@@ -312,7 +312,7 @@ const ExpensesPage = () => {
         onButtonPress={() => handleOpenModal()}
         buttonText="Nuevo Gasto"
         buttonVariant="info"
-        buttonIconName="add-outline"
+        buttonIconName="add-circle-outline"
         searchPlaceholder="Buscar gastos..."
       />
 

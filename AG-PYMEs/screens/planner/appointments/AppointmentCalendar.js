@@ -285,7 +285,7 @@ const AppointmentCalendar = ({
             >
               Hora
             </Text>
-          </View>{" "}
+          </View>
           {weekDates.map((date, index) => (
             <View
               key={`weekdate-${date.getTime()}-${index}`}

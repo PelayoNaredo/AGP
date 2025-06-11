@@ -235,7 +235,7 @@ const LeavesBody = ({ onLeaveUpdate }) => {
         onButtonPress={() => setShowModal(true)}
         buttonText="Nueva Baja"
         buttonVariant="info"
-        buttonIconName="add-outline"
+        buttonIconName="add-circle-outline"
         searchPlaceholder="Buscar por nombre de empleado..."
       />
       <ScrollView showsVerticalScrollIndicator={false} style={styles.content}>
