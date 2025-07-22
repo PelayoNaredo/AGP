@@ -11,7 +11,7 @@ import {
 import { useTheme } from "../../../context/ThemeContext";
 import ModalTemplate from "../../../components/modalTemplate";
 import { Ionicons } from "@expo/vector-icons";
-import { http } from "../../../api/http";
+import { Services } from "../../../api";
 import CustomButton from "../../../components/customButton";
 import NewClientForm from "./NewClientForm";
 
@@ -117,7 +117,6 @@ const ClientModal = ({
       marginTop: 8,
     },
   });
-
   // Cargar clientes al abrir el modal o al cambiar el estado de creación de nuevo cliente
   useEffect(() => {
     if (visible) {
@@ -147,17 +146,16 @@ const ClientModal = ({
         (client.telefono && client.telefono.includes(query))
     );
     setFilteredClients(filtered);
-  };
-
-  // Función para cargar los clientes desde la API
+  }; // Función para cargar los clientes desde la API
   const fetchClients = async () => {
     setIsLoading(true);
     try {
-      const response = await http.get("/api/clients");
-      setClients(response.data || []);
-      setFilteredClients(response.data || []);
+      const clients = await Services.Data.Clients.getAll();
+      setClients(clients);
+      setFilteredClients(clients);
     } catch (error) {
-      console.error("Error al cargar clientes:", error);
+      setClients([]);
+      setFilteredClients([]);
     } finally {
       setIsLoading(false);
     }
@@ -218,7 +216,6 @@ const ClientModal = ({
     );
   }
 
-  // De lo contrario, mostrar el modal de selección
   return (
     <ModalTemplate
       isVisible={visible}

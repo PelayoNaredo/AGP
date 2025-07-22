@@ -3,7 +3,6 @@ import {
   View,
   StyleSheet,
   Platform,
-  Alert,
   Share,
   Text,
   ScrollView,
@@ -34,6 +33,7 @@ import CartComponent from "./components/cart/CartComponent";
 import useCart from "../../../hooks/sales/useCart";
 import useSaleProcessor from "../../../hooks/sales/useSaleProcessor";
 import useNotification from "../../../hooks/sales/useNotification";
+import useNotifications from "../../../hooks/useNotifications";
 
 // Pagina principal del punto de venta
 const SalesPointScreen = () => {
@@ -46,10 +46,10 @@ const SalesPointScreen = () => {
   const [activeSegment, setActiveSegment] = useState("productos");
   const [selectedPrinter, setSelectedPrinter] = useState(null);
   const [newClientMode, setNewClientMode] = useState(false);
-
   // Hooks personalizados
   const cart = useCart();
   const notification = useNotification();
+  const notifications = useNotifications();
 
   // Función para gestionar el cambio de estado de la impresora
   const handlePrinterStatusChange = useCallback((printer) => {
@@ -66,24 +66,9 @@ const SalesPointScreen = () => {
       cart.clearCart();
 
       // Notificación de éxito
-      notification.showSuccess("Venta realizada correctamente");
-
-      // Opciones después de la venta
-      Alert.alert(
-        "Venta realizada",
-        `La venta #${response.id_venta} ha sido procesada correctamente.`,
-        [
-          { text: "OK", onPress: () => {} },
-          {
-            text: "Ver detalle",
-            onPress: () =>
-              navigation.navigate("SaleDetail", { saleId: response.id_venta }),
-          },
-          {
-            text: "Compartir comprobante",
-            onPress: () => shareSaleReceipt(response),
-          },
-        ]
+      notification.showSuccess("Venta realizada correctamente"); // Notificación de éxito con opciones
+      notifications.showSuccess(
+        `Venta #${response.id_venta} procesada correctamente`
       );
 
       // Imprime el ticket si se solicitó
@@ -249,10 +234,19 @@ const SalesPointScreen = () => {
                   <ClientSelector
                     client={selectedClient}
                     onSelectClient={() => {
+                      console.log(
+                        "🔔 SalesPointScreen: Client selector button pressed"
+                      );
                       setNewClientMode(false);
                       setIsClientModalVisible(true);
+                      console.log(
+                        "🔔 SalesPointScreen: Modal visibility set to true"
+                      );
                     }}
                     onAddNewClient={() => {
+                      console.log(
+                        "🔔 SalesPointScreen: Add new client button pressed"
+                      );
                       setNewClientMode(true);
                       setIsClientModalVisible(true);
                     }}
@@ -308,7 +302,9 @@ const SalesPointScreen = () => {
                   cart={cart}
                   onPayment={() =>
                     cart.isEmpty
-                      ? Alert.alert("Error", "El carrito está vacío")
+                      ? notifications.showErrorNotification(
+                          "El carrito está vacío"
+                        )
                       : setIsPaymentModalVisible(true)
                   }
                   isLoading={saleProcessor.isLoading}

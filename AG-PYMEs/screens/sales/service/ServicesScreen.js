@@ -5,7 +5,6 @@ import {
   StyleSheet,
   FlatList,
   Pressable,
-  Alert,
   ScrollView,
 } from "react-native";
 import { useTheme } from "../../../context/ThemeContext";
@@ -18,10 +17,12 @@ import CustomButton from "../../../components/customButton";
 import SearchHeaderBar from "../../../components/searchHeaderBar";
 import ModalTemplate from "../../../components/modalTemplate";
 import { Services } from "../../../api";
+import useNotifications from "../../../hooks/useNotifications";
 
 // Pagina de servicios, permite ver, crear, editar y eliminar servicios
 const ServicesScreen = () => {
   const { themeObject } = useTheme();
+  const notifications = useNotifications();
   const [services, setServices] = useState([]);
   const [filteredServices, setFilteredServices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -66,7 +67,9 @@ const ServicesScreen = () => {
       setCategories(["todos", ...uniqueCategories]);
     } catch (error) {
       console.error("Error al cargar servicios:", error);
-      Alert.alert("Error", "No se pudieron cargar los servicios");
+      notifications.showErrorNotification(
+        "No se pudieron cargar los servicios"
+      );
       setServices([]);
       setCategories(["todos"]);
     } finally {
@@ -126,7 +129,7 @@ const ServicesScreen = () => {
     try {
       if (!serviceId) {
         console.error("[ERROR] serviceId es undefined o null");
-        Alert.alert("Error", "ID de servicio no válido");
+        notifications.showErrorNotification("ID de servicio no válido");
         setLoading(false);
         return;
       }
@@ -143,8 +146,7 @@ const ServicesScreen = () => {
               : service
           )
         );
-        Alert.alert(
-          "Aviso",
+        notifications.showWarning(
           response.message ||
             "El servicio ha sido desactivado porque tiene ventas asociadas."
         );
@@ -153,12 +155,11 @@ const ServicesScreen = () => {
         setServices(
           services.filter((service) => service.id_servicio !== serviceId)
         );
-        Alert.alert("Éxito", "Servicio eliminado correctamente");
+        notifications.showSuccess("Servicio eliminado correctamente");
       }
     } catch (error) {
       console.error("[ERROR] Error al eliminar servicio:", error);
-      Alert.alert(
-        "Error",
+      notifications.showErrorNotification(
         "No se pudo eliminar el servicio: " +
           (error.message || "Error desconocido")
       );
@@ -190,14 +191,14 @@ const ServicesScreen = () => {
             : service
         )
       );
-
-      Alert.alert(
-        "Éxito",
+      notifications.showSuccess(
         `Servicio ${newStatus ? "activado" : "desactivado"} correctamente`
       );
     } catch (error) {
       console.error("Error al actualizar estado del servicio:", error);
-      Alert.alert("Error", "No se pudo actualizar el estado del servicio");
+      notifications.showErrorNotification(
+        "No se pudo actualizar el estado del servicio"
+      );
     } finally {
       setLoading(false);
     }

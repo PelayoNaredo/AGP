@@ -13,19 +13,12 @@ import CustomButton from "../../../components/customButton";
 import SearchHeaderBar from "../../../components/searchHeaderBar";
 import { Services } from "../../../api/index";
 import ExpensesModal from "./expensesModal";
-import {
-  usePerformanceMonitor,
-  PerformanceOverlay,
-} from "../../../utils/PerformanceMonitor";
 
 // Componente principal para gestionar gastos
 const ExpensesPage = () => {
   const { themeObject } = useTheme();
   const { width } = useWindowDimensions();
   const isMobile = width < 768; // Considerar dispositivo móvil si el ancho es menor a 768px
-
-  // Monitor de performance
-  const performanceMetrics = usePerformanceMonitor("ExpensesPage");
 
   const [expenses, setExpenses] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -379,9 +372,6 @@ const ExpensesPage = () => {
           warning={validationError}
         />
       </View>
-
-      {/* Monitor de performance solo en desarrollo */}
-      <PerformanceOverlay visible={__DEV__} />
     </View>
   );
 };

@@ -54,3 +54,20 @@ export const deleteClient = async (id) => {
     throw error;
   }
 };
+
+export const searchClients = async (term) => {
+  try {
+    if (!term || !term.trim()) {
+      // Si no hay término de búsqueda, devolver todos los clientes
+      return await getAllClients();
+    }
+
+    const response = await httpFetch(
+      `${clientsEndpoint.base()}/search?term=${encodeURIComponent(term)}`
+    );
+    return Array.isArray(response) ? response : [];
+  } catch (error) {
+    console.error("Error al buscar clientes:", error);
+    return []; // Devolver array vacío en caso de error
+  }
+};

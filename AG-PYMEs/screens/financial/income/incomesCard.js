@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Pressable } from "react-native";
 import { useTheme } from "../../../context/ThemeContext";
 
 //Componente que muestra los detalles de un ingreso
+// funcion onDelete no implementada, se debe pasar como prop si se desea usar
 const IncomesCard = ({ item, onPress }) => {
   const { themeObject } = useTheme();
 

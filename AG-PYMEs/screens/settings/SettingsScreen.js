@@ -76,7 +76,7 @@ const SettingsScreen = () => {
           entering={FadeInDown.delay(400).duration(500).springify()}
         >
           <ThemeSelector onThemeChange={handleThemeChange} />
-        </Animated.View>{" "}
+        </Animated.View>
         <Animated.View
           entering={SlideInRight.delay(500).duration(600).springify()}
         >
@@ -89,7 +89,7 @@ const SettingsScreen = () => {
           >
             Guardar Cambios
           </CustomButton>
-        </Animated.View>{" "}
+        </Animated.View>
         {/* Botón de cerrar sesión */}
         <Animated.View
           entering={SlideInRight.delay(600).duration(600).springify()}

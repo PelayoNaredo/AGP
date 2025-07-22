@@ -22,7 +22,7 @@ import Animated, {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import CustomButton from "./customButton";
 import { useTheme } from "../context/ThemeContext";
-import { ANIMATION_CONFIGS } from "./animations";
+import { ANIMATION_CONFIGS, TIMING_CONFIGS } from "./animations";
 
 // Componente reutilizable que muestra un modal con título, texto, advertencia y botones de acción.
 const ModalTemplate = ({
@@ -51,11 +51,11 @@ const ModalTemplate = ({
   React.useEffect(() => {
     if (isVisible) {
       // Animaciones de entrada escalonadas
-      backdropOpacity.value = withTiming(1, ANIMATION_CONFIGS.timing.medium);
-      modalScale.value = withSpring(1, ANIMATION_CONFIGS.spring.softSpring);
-      modalTranslateY.value = withSpring(0, ANIMATION_CONFIGS.spring.spring);
+      backdropOpacity.value = withTiming(1, TIMING_CONFIGS.timing.medium);
+      modalScale.value = withSpring(1, TIMING_CONFIGS.spring.softSpring);
+      modalTranslateY.value = withSpring(0, TIMING_CONFIGS.spring.spring);
       contentOpacity.value = withTiming(1, {
-        ...ANIMATION_CONFIGS.timing.medium,
+        ...TIMING_CONFIGS.timing.medium,
         delay: 100,
       });
     }
@@ -63,10 +63,10 @@ const ModalTemplate = ({
 
   // Función para cerrar modal con animación
   const closeModal = React.useCallback(() => {
-    backdropOpacity.value = withTiming(0, ANIMATION_CONFIGS.timing.fast);
-    modalScale.value = withTiming(0.95, ANIMATION_CONFIGS.timing.fast);
-    modalTranslateY.value = withTiming(30, ANIMATION_CONFIGS.timing.fast);
-    contentOpacity.value = withTiming(0, ANIMATION_CONFIGS.timing.fast, () => {
+    backdropOpacity.value = withTiming(0, TIMING_CONFIGS.timing.fast);
+    modalScale.value = withTiming(0.95, TIMING_CONFIGS.timing.fast);
+    modalTranslateY.value = withTiming(30, TIMING_CONFIGS.timing.fast);
+    contentOpacity.value = withTiming(0, TIMING_CONFIGS.timing.fast, () => {
       if (cancelAction) {
         runOnJS(cancelAction)();
       }
@@ -89,10 +89,10 @@ const ModalTemplate = ({
       } else {
         modalTranslateY.value = withSpring(
           0,
-          ANIMATION_CONFIGS.spring.quickSpring
+          TIMING_CONFIGS.spring.quickSpring
         );
-        backdropOpacity.value = withTiming(1, ANIMATION_CONFIGS.timing.fast);
-        modalScale.value = withSpring(1, ANIMATION_CONFIGS.spring.quickSpring);
+        backdropOpacity.value = withTiming(1, TIMING_CONFIGS.timing.fast);
+        modalScale.value = withSpring(1, TIMING_CONFIGS.spring.quickSpring);
       }
     });
 

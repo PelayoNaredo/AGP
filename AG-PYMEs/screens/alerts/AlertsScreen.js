@@ -130,7 +130,6 @@ const AlertsScreen = () => {
         { backgroundColor: themeObject.colors.background },
       ]}
     >
-      {" "}
       <Animated.View
         style={styles.header}
         entering={FadeInUp.duration(600).springify()}

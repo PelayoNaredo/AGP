@@ -208,7 +208,6 @@ const EmployeeModal = ({ visible, employee, onClose, onSubmit, loading }) => {
 
     onSubmit(payload);
   };
-  // Función eliminada (código muerto): getFileExtensionFromType
 
   return (
     <ModalTemplate

@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, TextInput, ScrollView } from "react-native";
 import { useTheme } from "../../../context/ThemeContext";
 import ModalTemplate from "../../../components/modalTemplate";
-import { http } from "../../../api/http";
+import { Services } from "../../../api";
 import CustomPicker from "../../../components/customPicker";
+import useNotifications from "../../../hooks/useNotifications";
 
 // Componente NewClientForm para crear o editar clientes
 const NewClientForm = ({
@@ -32,6 +33,7 @@ const NewClientForm = ({
   },
 }) => {
   const { themeObject } = useTheme();
+  const notifications = useNotifications();
   const [isLoading, setIsLoading] = useState(false);
   const [newClient, setNewClient] = useState(clientToEdit || initialData);
   const isEditMode = !!clientToEdit;
@@ -80,13 +82,13 @@ const NewClientForm = ({
       gap: 8,
       marginTop: 8,
     },
-  });
-
-  // Función para manejar el guardado de un nuevo cliente o la actualización de uno existente
+  }); // Función para manejar el guardado de un nuevo cliente o la actualización de uno existente
   const handleSaveNewClient = async () => {
     // Validación básica
     if (!newClient.nombre || !newClient.apellido) {
-      alert("Por favor introduce nombre y apellido");
+      notifications.showErrorNotification(
+        "Por favor introduce nombre y apellido"
+      );
       return;
     }
 
@@ -96,21 +98,13 @@ const NewClientForm = ({
 
       if (isEditMode) {
         // Actualizar cliente existente
-        response = await http.put(
-          `/api/clients/${newClient.id_cliente}`,
+        response = await Services.Data.Clients.update(
+          newClient.id_cliente,
           newClient
         );
-
-        if (!response) {
-          throw new Error("Error al actualizar el cliente");
-        }
       } else {
         // Crear nuevo cliente
-        response = await http.post("/api/clients", newClient);
-
-        if (!response || !response.id_cliente) {
-          throw new Error("Error al crear el cliente");
-        }
+        response = await Services.Data.Clients.create(newClient);
       }
 
       // Notificar que se ha creado/actualizado un cliente
@@ -120,7 +114,7 @@ const NewClientForm = ({
         `Error al ${isEditMode ? "actualizar" : "crear"} cliente:`,
         error
       );
-      alert(
+      notifications.showErrorNotification(
         `No se pudo ${isEditMode ? "actualizar" : "crear"} el cliente. ${error.message || ""}`
       );
     } finally {

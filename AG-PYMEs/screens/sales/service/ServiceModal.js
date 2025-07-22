@@ -8,7 +8,6 @@ import {
   Pressable,
   Switch,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { useTheme } from "../../../context/ThemeContext";
 import ModalTemplate from "../../../components/modalTemplate";
@@ -16,10 +15,12 @@ import { Ionicons } from "@expo/vector-icons";
 import CustomButton from "../../../components/customButton";
 import CustomPicker from "../../../components/customPicker";
 import { Services } from "../../../api";
+import useNotifications from "../../../hooks/useNotifications";
 
 // Componente ServiceModal para crear o editar servicios
 const ServiceModal = ({ visible, onClose, service = null, onSave }) => {
   const { themeObject } = useTheme();
+  const notifications = useNotifications();
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
@@ -147,12 +148,16 @@ const ServiceModal = ({ visible, onClose, service = null, onSave }) => {
   const handleSave = async () => {
     // Validación básica
     if (!formData.nombre_servicio.trim()) {
-      Alert.alert("Error", "El nombre del servicio es obligatorio");
+      notifications.showErrorNotification(
+        "El nombre del servicio es obligatorio"
+      );
       return;
     }
 
     if (!formData.precio_base.trim() || isNaN(Number(formData.precio_base))) {
-      Alert.alert("Error", "El precio base debe ser un número válido");
+      notifications.showErrorNotification(
+        "El precio base debe ser un número válido"
+      );
       return;
     }
 
@@ -160,12 +165,15 @@ const ServiceModal = ({ visible, onClose, service = null, onSave }) => {
       formData.duracion_estimada_minutos.trim() &&
       isNaN(Number(formData.duracion_estimada_minutos))
     ) {
-      Alert.alert("Error", "La duración debe ser un número válido");
+      notifications.showErrorNotification(
+        "La duración debe ser un número válido"
+      );
       return;
-    } // Validaciones específicas para servicios por nivel
+    }
+
+    // Validaciones específicas para servicios por nivel
     if (formData.tipo_tarifa === "por_nivel" && serviceLevels.length === 0) {
-      Alert.alert(
-        "Error",
+      notifications.showErrorNotification(
         "Debes añadir al menos un nivel para este tipo de tarifa"
       );
       return;
@@ -179,10 +187,8 @@ const ServiceModal = ({ visible, onClose, service = null, onSave }) => {
           !level.precio?.toString().trim() ||
           isNaN(parseFloat(level.precio))
       );
-
       if (invalidLevels.length > 0) {
-        Alert.alert(
-          "Error",
+        notifications.showErrorNotification(
           "Todos los niveles deben tener un nombre y un precio válido"
         );
         return;
@@ -222,16 +228,12 @@ const ServiceModal = ({ visible, onClose, service = null, onSave }) => {
       onSave(result);
       onClose();
     } catch (error) {
-      console.error("Error al guardar servicio:", error);
-
-      // Mostrar mensaje de error más específico
+      console.error("Error al guardar servicio:", error); // Mostrar mensaje de error más específico
       const errorMessage = error.message
         ? error.message
         : "No se pudo guardar el servicio";
 
-      Alert.alert("Error", errorMessage, [
-        { text: "OK", onPress: () => console.log("OK Pressed") },
-      ]);
+      notifications.showErrorNotification(errorMessage);
     } finally {
       setLoading(false);
     }
