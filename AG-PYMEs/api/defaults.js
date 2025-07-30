@@ -27,13 +27,16 @@ export const handleResponse = async (response) => {
     );
     error.status = response.status;
     error.data = errorData;
+
     throw error;
   }
 
   // Manejar respuestas exitosas
   try {
-    return responseText ? JSON.parse(responseText) : null;
+    const parsed = responseText ? JSON.parse(responseText) : null;
+    return parsed;
   } catch (error) {
+    console.warn("JSON parse failed, returning raw text");
     return responseText || null;
   }
 };

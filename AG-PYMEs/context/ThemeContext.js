@@ -104,7 +104,9 @@ const ThemeContext = createContext();
 export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState("claro");
   const [themeObject, setThemeObject] = useState(lightTheme);
-  const [isLoading, setIsLoading] = useState(true); // Función para aplicar el tema consistentemente
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Función para aplicar el tema consistentemente
   const applyTheme = async (themeName, updateApi = true) => {
     // Validación para evitar temas inválidos
     const validThemeName = themeName === "oscuro" ? "oscuro" : "claro";
@@ -128,7 +130,9 @@ export const ThemeProvider = ({ children }) => {
           "--current-theme",
           validThemeName
         );
-      } // Guardar en caché local (para consistencia en móvil)
+      }
+
+      // Guardar en caché local (para consistencia en móvil)
       await Services.Storage.Base.setItem("appTheme", validThemeName);
     } catch (error) {
       console.error("Error guardando tema:", error);

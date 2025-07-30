@@ -17,7 +17,7 @@
 
 ---
 
-## 📊 Resumen Ejecutivo
+## Resumen Ejecutivo
 
 ### Visión del Proyecto
 
@@ -670,7 +670,7 @@ Completar la transformación digital con capacidades enterprise y preparar para 
 
 ---
 
-## ⚠️ Gestión de Riesgos
+## Gestión de Riesgos
 
 ### Identificación de Riesgos Críticos
 
@@ -834,7 +834,7 @@ Completar la transformación digital con capacidades enterprise y preparar para 
 
 ---
 
-## 📊 KPIs y Métricas de Éxito
+## KPIs y Métricas de Éxito
 
 ### Métricas de Proyecto
 

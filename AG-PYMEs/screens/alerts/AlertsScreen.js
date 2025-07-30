@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import Animated, {
   ZoomIn,
 } from "react-native-reanimated";
 import { useTheme } from "../../context/ThemeContext";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import AlertCard from "./AlertCard";
 import AlertFilter from "./AlertFilter";
@@ -35,92 +35,144 @@ const AlertsScreen = () => {
     estado: "todos",
     tipo: "todos",
   });
-  const fetchAlerts = async () => {
+
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  /**
+   * Fetch de alertas con cache optimizado
+   * Mantiene la misma interfaz pero usa cache internamente
+   */
+  const fetchAlerts = useCallback(async (forceRefresh = false) => {
     try {
-      const data = await Services.Data.Alerts.getAll();
-      setAlerts(data);
+      // Verificación defensiva para Services
+      if (!Services || !Services.Data || !Services.Data.Alerts) {
+        console.error(
+          "[ALERTS_SCREEN]   Services.Data.Alerts no está disponible"
+        );
+        return;
+      }
+
+      const startTime = Date.now();
+
+      // Usar servicio optimizado con cache
+      const data = await Services.Data.Alerts.getAll(forceRefresh);
+
+      const duration = Date.now() - startTime;
+
+      setAlerts(data || []);
+      setIsInitialLoad(false);
     } catch (error) {
       console.error("Error al cargar alertas:", error);
+      setIsInitialLoad(false);
     }
-  };
-
-  useEffect(() => {
-    fetchAlerts();
   }, []);
 
-  const onRefresh = async () => {
+  // Solo cargar en focus si es la primera vez o no hay datos
+  useFocusEffect(
+    useCallback(() => {
+      // Solo cargar si realmente es necesario
+      if (isInitialLoad) {
+        fetchAlerts();
+      }
+      // No recargar si ya tenemos datos y no es la primera vez
+    }, [fetchAlerts, isInitialLoad])
+  );
+
+  /**
+   * Refresh optimizado - fuerza actualización desde servidor
+   */
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchAlerts();
+    await fetchAlerts(true); // Force refresh para pull-to-refresh
     setRefreshing(false);
-  };
+  }, [fetchAlerts]);
 
-  const handleFilterChange = (key, value) => {
+  const handleFilterChange = useCallback((key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
-  };
+  }, []);
 
-  const handleCompleteAlert = async (alertId) => {
-    try {
-      // Encontrar la alerta actual en el array de alertas
-      const currentAlert = alerts.find(
-        (alert) => alert.id_recordatorio === alertId
-      );
-      if (!currentAlert) return; // Actualizar la alerta manteniendo todos los datos existentes
-      await Services.Data.Alerts.update(alertId, {
-        ...currentAlert,
-        estado:
-          currentAlert.estado === "completado" ? "pendiente" : "completado",
-      });
-      await fetchAlerts();
-    } catch (error) {
-      console.error("Error al actualizar alerta:", error);
-    }
-  };
+  const handleCompleteAlert = useCallback(
+    async (alertId) => {
+      try {
+        // Encontrar la alerta actual en el array de alertas
+        const currentAlert = alerts.find(
+          (alert) => alert.id_recordatorio === alertId
+        );
+        if (!currentAlert) return;
 
-  const filteredAlerts = alerts.filter((alert) => {
-    const matchesEstado =
-      filters.estado === "todos" || alert.estado === filters.estado;
-    const matchesTipo = filters.tipo === "todos" || alert.tipo === filters.tipo;
-    return matchesEstado && matchesTipo;
-  });
+        // Actualizar la alerta manteniendo todos los datos existentes
+        await Services.Data.Alerts.update(alertId, {
+          ...currentAlert,
+          estado:
+            currentAlert.estado === "completado" ? "pendiente" : "completado",
+        });
+
+        // Refresh después de modificación (invalida cache automáticamente)
+        await fetchAlerts(false); // No forzar, el cache ya se invalidó
+      } catch (error) {
+        console.error("Error al actualizar alerta:", error);
+      }
+    },
+    [alerts, fetchAlerts]
+  );
+
+  // Memoizar el filtrado para evitar recálculos innecesarios
+  const filteredAlerts = useMemo(() => {
+    return alerts.filter((alert) => {
+      const matchesEstado =
+        filters.estado === "todos" || alert.estado === filters.estado;
+      const matchesTipo =
+        filters.tipo === "todos" || alert.tipo === filters.tipo;
+      return matchesEstado && matchesTipo;
+    });
+  }, [alerts, filters]);
 
   // Función para manejar el envío del formulario
-  const handleFormSubmit = async (formData) => {
-    try {
-      if (editingAlert) {
-        // Actualizar alerta existente
-        await Services.Data.Alerts.update(
-          editingAlert.id_recordatorio,
-          formData
-        );
-      } else {
-        // Crear nueva alerta
-        await Services.Data.Alerts.create(formData);
-      }
-      await fetchAlerts();
-      setShowCreateForm(false);
-      setEditingAlert(null);
-    } catch (error) {
-      console.error("Error guardando alerta:", error);
-    }
-  };
+  const handleFormSubmit = useCallback(
+    async (formData) => {
+      try {
+        if (editingAlert) {
+          // Actualizar alerta existente
+          await Services.Data.Alerts.update(
+            editingAlert.id_recordatorio,
+            formData
+          );
+        } else {
+          // Crear nueva alerta
+          await Services.Data.Alerts.create(formData);
+        }
 
-  const renderAlertItem = ({ item, index }) => (
-    <Animated.View
-      entering={FadeInDown.delay(index * 100)
-        .duration(500)
-        .springify()}
-      exiting={SlideOutLeft.duration(300)}
-      layout={Layout.springify()}
-    >
-      <AlertCard
-        alert={item}
-        onPress={() => {
-          setEditingAlert(item);
-          setShowCreateForm(true);
-        }}
-        onComplete={() => handleCompleteAlert(item.id_recordatorio)}
-      />
-    </Animated.View>
+        // Refresh después de modificación
+        await fetchAlerts(false); // Cache se invalida automáticamente
+        setShowCreateForm(false);
+        setEditingAlert(null);
+      } catch (error) {
+        console.error("Error guardando alerta:", error);
+      }
+    },
+    [editingAlert, fetchAlerts]
+  );
+
+  const renderAlertItem = useCallback(
+    ({ item, index }) => (
+      <Animated.View
+        entering={FadeInDown.delay(index * 100)
+          .duration(500)
+          .springify()}
+        exiting={SlideOutLeft.duration(300)}
+        layout={Layout.springify()}
+      >
+        <AlertCard
+          alert={item}
+          onPress={() => {
+            setEditingAlert(item);
+            setShowCreateForm(true);
+          }}
+          onComplete={() => handleCompleteAlert(item.id_recordatorio)}
+        />
+      </Animated.View>
+    ),
+    [handleCompleteAlert]
   );
 
   return (
@@ -155,12 +207,14 @@ const AlertsScreen = () => {
           Nueva Alerta
         </CustomButton>
       </Animated.View>
+
       <ScrollView>
         <Animated.View
           entering={FadeInDown.delay(300).duration(500).springify()}
         >
           <AlertFilter filters={filters} onFilterChange={handleFilterChange} />
         </Animated.View>
+
         <Animated.View entering={FadeInUp.delay(400).duration(700).springify()}>
           <FlatList
             data={filteredAlerts}
@@ -185,6 +239,7 @@ const AlertsScreen = () => {
           />
         </Animated.View>
       </ScrollView>
+
       <AlertModal
         visible={showCreateForm}
         initialData={editingAlert}
@@ -236,4 +291,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AlertsScreen;
+export default React.memo(AlertsScreen);

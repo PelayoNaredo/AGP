@@ -23,10 +23,23 @@ export const getShiftById = async (id) => {
 
 export const getShiftByDate = async (fecha_inicio_semana) => {
   try {
-    const shifts = await httpFetch(shiftsEndpoint.byDate(fecha_inicio_semana));
+    const endpoint = shiftsEndpoint.byDate(fecha_inicio_semana);
+    const shifts = await httpFetch(endpoint);
     return shifts;
   } catch (error) {
-    console.error("Error en getShiftByDate:", error);
+    console.error("Error getting shifts:", error.message);
+    throw error;
+  }
+};
+
+// Método optimizado para cache mensual
+export const getShiftsByMonth = async (year, month) => {
+  try {
+    const endpoint = shiftsEndpoint.byMonth(year, month);
+    const monthlyData = await httpFetch(endpoint);
+    return monthlyData;
+  } catch (error) {
+    console.error("Error getting monthly shifts:", error.message);
     throw error;
   }
 };

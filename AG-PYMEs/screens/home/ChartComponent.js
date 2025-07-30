@@ -98,7 +98,37 @@ export const ChartComponent = ({ data }) => {
   const barData = data.reduce((acc, item, index) => {
     const period = periods.find((p) => p.id === item.periodo);
     if (period) {
-      acc.push(initialBarData.find((bar) => Math.abs(item.y) === bar.value));
+      // Búsqueda segura del elemento en initialBarData
+      const barItem = initialBarData.find(
+        (bar) => Math.abs(item.y) === bar.value
+      );
+
+      // Solo agregar si encontramos el elemento para evitar undefined
+      if (barItem) {
+        acc.push(barItem);
+      } else {
+        // Fallback en caso de no encontrar el elemento
+        acc.push({
+          value: Math.abs(item.y),
+          label: "",
+          spacing: 2,
+          frontColor: period.color,
+          topLabelComponent: () => (
+            <View style={styles.barLabelContainer}>
+              <Text
+                style={[
+                  styles.barLabel,
+                  {
+                    color: themeObject.colors.text,
+                    backgroundColor: themeObject.colors.card,
+                    fontSize: fontSize,
+                  },
+                ]}
+              ></Text>
+            </View>
+          ),
+        });
+      }
     }
 
     //Barras dummy con el label de grupo

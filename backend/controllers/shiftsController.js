@@ -199,7 +199,6 @@ export const getShiftByDate = async (req, res) => {
         (s) => s.id_empleado === empleado.id_empleado
       );
 
-      // Crear objeto base con información del empleado y turnos
       const shiftObj = {
         id_empleado: empleado.id_empleado,
         fecha_inicio_semana,
@@ -217,7 +216,7 @@ export const getShiftByDate = async (req, res) => {
     res.json(result);
   } catch (error) {
     await client.query("ROLLBACK");
-    console.error("Error al obtener horarios:", error);
+    console.error("Error:", error.message);
     res.status(500).json({ message: "Error interno del servidor" });
   } finally {
     client.release();
@@ -416,6 +415,90 @@ export const getMonthlyShiftsForExport = async (req, res) => {
     res
       .status(500)
       .json({ message: "Error interno del servidor", error: error.toString() });
+  } finally {
+    client.release();
+  }
+};
+
+// Obtener horarios mensuales optimizado para cache
+export const getShiftsByMonth = async (req, res) => {
+  const { year, month } = req.params;
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // Validar parámetros
+    const yearNum = parseInt(year);
+    const monthNum = parseInt(month);
+
+    if (isNaN(yearNum) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+      return res.status(400).json({ message: "Año o mes inválido" });
+    }
+
+    // Obtener todos los empleados activos
+    const employees = await client.query(
+      "SELECT * FROM employees WHERE activo = true"
+    );
+
+    // Obtener todas las semanas que comienzan en el mes solicitado
+    const shiftsResult = await client.query(
+      `
+      SELECT s.id_horario, s.id_empleado, s.fecha_inicio_semana, 
+             si.dia_semana, si.hora_entrada, si.hora_salida
+      FROM shifts s
+      LEFT JOIN shift_intervals si ON s.id_horario = si.id_horario
+      WHERE EXTRACT(YEAR FROM s.fecha_inicio_semana::date) = $1
+      AND EXTRACT(MONTH FROM s.fecha_inicio_semana::date) = $2
+      ORDER BY s.fecha_inicio_semana, s.id_empleado, si.dia_semana, si.hora_entrada
+      `,
+      [yearNum, monthNum]
+    );
+
+    // Agrupar por fecha_inicio_semana
+    const weekGroups = {};
+    shiftsResult.rows.forEach((row) => {
+      const week = row.fecha_inicio_semana;
+      if (!weekGroups[week]) {
+        weekGroups[week] = [];
+      }
+      weekGroups[week].push(row);
+    });
+
+    // Crear estructura de respuesta por semana
+    const result = {};
+
+    Object.keys(weekGroups).forEach((week) => {
+      result[week] = employees.rows.map((empleado) => {
+        const empleadoShifts = weekGroups[week].filter(
+          (s) => s.id_empleado === empleado.id_empleado
+        );
+
+        return {
+          id_empleado: empleado.id_empleado,
+          fecha_inicio_semana: week,
+          intervals: empleadoShifts
+            .filter((s) => s.dia_semana !== null)
+            .map((s) => ({
+              dia_semana: s.dia_semana,
+              hora_entrada: s.hora_entrada,
+              hora_salida: s.hora_salida,
+            })),
+        };
+      });
+    });
+
+    await client.query("COMMIT");
+
+    res.json({
+      year: yearNum,
+      month: monthNum,
+      weeks: result,
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error getting monthly shifts:", error.message);
+    res.status(500).json({ message: "Error interno del servidor" });
   } finally {
     client.release();
   }

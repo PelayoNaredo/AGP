@@ -89,7 +89,7 @@ Si es su primer acceso:
 
 El Dashboard es su centro de comando, mostrando información crucial de un vistazo:
 
-#### 📊 Tarjetas de Resumen
+#### Tarjetas de Resumen
 
 **Resumen Financiero**
 

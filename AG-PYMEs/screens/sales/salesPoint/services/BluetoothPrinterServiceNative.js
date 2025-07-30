@@ -1,5 +1,6 @@
 import { BluetoothPrinter } from "react-native-thermal-receipt-printer";
-import { Alert } from "react-native";
+import { Platform } from "react-native";
+import useNotifications from "../../../../hooks/useNotifications";
 
 /**
  * Servicio para manejar las operaciones de la impresora Bluetooth

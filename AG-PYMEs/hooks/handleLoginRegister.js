@@ -1,16 +1,17 @@
 import { useState } from "react";
-import { Alert } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { httpFetch } from "../api/http";
+import useNotifications from "./useNotifications";
 
 const useAuthLogic = () => {
   const { login } = useAuth();
+  const { showError } = useNotifications();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // login
   const handleLogin = async (email, password) => {
     if (!email || !password) {
-      Alert.alert("Error", "Por favor, completa todos los campos.");
+      showError("Error", "Por favor, completa todos los campos.");
       return;
     }
 
@@ -20,10 +21,7 @@ const useAuthLogic = () => {
       await login({ email, contrasena: password }); // el contexto hace el fetch
     } catch (error) {
       console.error("Error en handleLogin:", error);
-      Alert.alert(
-        "Error",
-        error.message || "Hubo un problema al iniciar sesión"
-      );
+      showError("Error", error.message || "Hubo un problema al iniciar sesión");
     } finally {
       setIsSubmitting(false);
     }
@@ -46,7 +44,7 @@ const useAuthLogic = () => {
       // al registrarte, auto‑login:
       await login({ email, contrasena: password });
     } catch (err) {
-      Alert.alert("Error", err.message || "…");
+      showError("Error", err.message || "…");
     } finally {
       setIsSubmitting(false);
     }

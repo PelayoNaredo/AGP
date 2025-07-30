@@ -105,6 +105,7 @@ export const shiftsEndpoint = {
   base: () => `${BASE}/api/shifts`,
   byId: (id) => `${BASE}/api/shifts/${id}`,
   byDate: (fecha) => `${BASE}/api/shifts/date/${fecha}`,
+  byMonth: (year, month) => `${BASE}/api/shifts/month/${year}/${month}`,
   exportMonth: (fecha) => `${BASE}/api/shifts/export/month/${fecha}`,
   save: () => `${BASE}/api/shifts/save`,
   copy: (sourceWeek, targetWeek) =>

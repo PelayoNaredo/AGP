@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Services } from "../../../api/index";
+import { useUnifiedCache } from "../../../cache/hooks/useUnifiedCache";
 import useNotifications from "../../../hooks/useNotifications";
 
 // Maneja la lógica de la pantalla de gestión de citas
@@ -13,6 +14,37 @@ const AppointmentManagerContainer = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { showError, showSuccess, showInfo } = useNotifications();
+
+  // Hook del cache unificado (compatible con API anterior)
+  const cache = useUnifiedCache();
+  const {
+    getEmployees,
+    getServices,
+    getClients,
+    getAppointmentsByDateRange,
+    invalidateAppointments,
+    isLoading: isCacheLoading,
+    getStats,
+  } = cache;
+
+  // Debug: Log cache stats periodically
+  useEffect(() => {
+    const logCacheStats = () => {
+      try {
+        const stats = getStats();
+      } catch (error) {
+        console.warn("[AppointmentManager] Could not get cache stats:", error);
+      }
+    };
+
+    // Log stats every 30 seconds
+    const interval = setInterval(logCacheStats, 30000);
+
+    // Log initial stats
+    logCacheStats();
+
+    return () => clearInterval(interval);
+  }, [getStats]);
 
   // Formatear fecha a YYYY-MM-DD
   function formatPostgresDate(date) {
@@ -63,12 +95,12 @@ const AppointmentManagerContainer = ({ children }) => {
       endDate: formatToPostgresTimestamp(endDate),
     };
   };
-  // Cargar datos iniciales
+  // Cargar datos iniciales con cache optimizado
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
-        setError(null); // Limpiar errores previos
+        setError(null);
 
         // Obtener el rango de fechas para la vista actual
         const { startDate, endDate } = getDateRangeForView(
@@ -77,12 +109,24 @@ const AppointmentManagerContainer = ({ children }) => {
         );
 
         try {
-          // Realizar solicitudes a la API en paralelo para optimizar
+          // Usar cache inteligente para cargar datos - forzar refresh si es un cambio de mes
+          const currentMonth = selectedDate.getMonth();
+          const currentYear = selectedDate.getFullYear();
+          const forceRefresh =
+            !appointments.length || // Primera carga
+            appointments.some((apt) => {
+              const aptDate = new Date(apt.fecha_inicio || apt.fecha_cita);
+              return (
+                aptDate.getMonth() !== currentMonth ||
+                aptDate.getFullYear() !== currentYear
+              );
+            });
+
           const results = await Promise.allSettled([
-            Services.Data.Appointments.getByDateRange(startDate, endDate),
-            Services.Data.Employees.getAll(),
-            Services.Data.Services.getAll(),
-            Services.Data.Clients.getAll(),
+            getAppointmentsByDateRange(startDate, endDate, forceRefresh),
+            getEmployees(), // Cache de 30 min
+            getServices(), // Cache de 30 min
+            getClients(), // Cache de 15 min
           ]);
 
           // Procesar los resultados
@@ -121,7 +165,9 @@ const AppointmentManagerContainer = ({ children }) => {
             setClients(results[3].value);
           } else {
             console.warn("Error al cargar clientes:", results[3].reason);
-          } // Verificar si hubo algún error en las respuestas
+          }
+
+          // Verificar si hubo algún error en las respuestas
           const errors = results
             .filter((r) => r.status === "rejected")
             .map((r) => r.reason?.message || "Error desconocido");
@@ -153,7 +199,16 @@ const AppointmentManagerContainer = ({ children }) => {
     };
 
     loadData();
-  }, [selectedDate, selectedView]); // Crear una nueva cita
+  }, [
+    selectedDate,
+    selectedView,
+    getAppointmentsByDateRange,
+    getEmployees,
+    getServices,
+    getClients,
+  ]); // Dependencias optimizadas
+
+  // Crear una nueva cita
   const handleCreateAppointment = async (appointmentData) => {
     try {
       setLoading(true);
@@ -170,6 +225,15 @@ const AppointmentManagerContainer = ({ children }) => {
       // Actualizar las citas locales
       setAppointments((prev) => [...prev, result]);
 
+      // Invalidar cache de appointments para refrescar datos
+      await invalidateAppointments();
+
+      // También invalida el cache específico del mes de la nueva cita
+      const appointmentDate = new Date(
+        result.fecha_inicio || result.fecha_cita
+      );
+      const monthKey = `${appointmentDate.getFullYear()}-${String(appointmentDate.getMonth() + 1).padStart(2, "0")}`;
+      await cache.invalidate(`appointments_monthly_${monthKey}`);
       // Mostrar notificación de éxito
       showSuccess("Cita creada correctamente");
 
@@ -182,7 +246,9 @@ const AppointmentManagerContainer = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }; // Actualizar una cita existente
+  };
+
+  // Actualizar una cita existente
   const handleUpdateAppointment = async (id, appointmentData) => {
     try {
       setLoading(true);
@@ -202,6 +268,16 @@ const AppointmentManagerContainer = ({ children }) => {
           appointment.id_cita === id ? result : appointment
         )
       );
+
+      // Invalidar cache de appointments para refrescar datos
+      await invalidateAppointments();
+
+      // También invalida el cache específico del mes de la cita actualizada
+      const appointmentDate = new Date(
+        result.fecha_inicio || result.fecha_cita
+      );
+      const monthKey = `${appointmentDate.getFullYear()}-${String(appointmentDate.getMonth() + 1).padStart(2, "0")}`;
+      await cache.invalidate(`appointments_monthly_${monthKey}`);
 
       // Mostrar notificación de éxito
       showSuccess("Cita actualizada correctamente");
@@ -229,6 +305,8 @@ const AppointmentManagerContainer = ({ children }) => {
         )
       );
 
+      // Invalidar cache de appointments para refrescar datos
+      await invalidateAppointments();
       // Mostrar notificación según el estado
       if (status === "completada") {
         showSuccess("Cita marcada como completada");
@@ -251,16 +329,35 @@ const AppointmentManagerContainer = ({ children }) => {
       setLoading(false);
     }
   };
+
   // Eliminar una cita
   const handleDeleteAppointment = async (id) => {
     try {
       setLoading(true);
+
+      // Obtener la cita antes de eliminarla para invalidar el cache correcto
+      const appointmentToDelete = appointments.find(
+        (apt) => apt.id_cita === id
+      );
+
       await Services.Data.Appointments.delete(id);
 
       // Eliminar la cita de las citas locales
       setAppointments((prev) =>
         prev.filter((appointment) => appointment.id_cita !== id)
       );
+
+      // Invalidar cache de appointments para refrescar datos
+      await invalidateAppointments();
+
+      // También invalida el cache específico del mes de la cita eliminada
+      if (appointmentToDelete) {
+        const appointmentDate = new Date(
+          appointmentToDelete.fecha_inicio || appointmentToDelete.fecha_cita
+        );
+        const monthKey = `${appointmentDate.getFullYear()}-${String(appointmentDate.getMonth() + 1).padStart(2, "0")}`;
+        await cache.invalidate(`appointments_monthly_${monthKey}`);
+      }
 
       // Mostrar notificación de éxito
       showSuccess("Cita eliminada correctamente");

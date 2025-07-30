@@ -27,7 +27,7 @@
 
 ## 🚀 Características Principales
 
-### 📊 Dashboard Inteligente
+### Dashboard Inteligente
 
 - Panel de control con métricas en tiempo real
 - Tarjetas de resumen financiero (ingresos, gastos, beneficios)
@@ -254,7 +254,7 @@ AG-PYMEs/
 │   ├── 🎯 controllers/        # Lógica de negocio
 │   ├── 🛣️ routes/             # Definición de rutas API
 │   ├── 🔒 middleware/         # Middleware de autenticación
-│   ├── 📊 models/             # Modelos de base de datos
+│   ├──    models/             # Modelos de base de datos
 │   └── 🔧 utils/              # Utilidades del servidor
 
 └── 📚 docs/                   # Documentación del proyecto
@@ -310,7 +310,7 @@ npm test
 npm run detect-dead-code
 ```
 
-## 📊 Performance
+## Performance
 
 - **Carga inicial**: < 3 segundos
 - **Navegación**: Transiciones fluidas con animaciones

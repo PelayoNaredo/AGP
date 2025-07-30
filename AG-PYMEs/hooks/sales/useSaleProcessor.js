@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { Alert } from "react-native";
 import { Services } from "../../api/index";
 import taxCalculator from "../../utils/financial/taxCalculator";
+import useNotifications from "../useNotifications";
 
 //Hook personalizado para gestionar el procesamiento de ventas
 const useSaleProcessor = ({
@@ -12,6 +13,7 @@ const useSaleProcessor = ({
   onComplete,
   selectedPrinter,
 }) => {
+  const { showError, showSuccess, showConfirmDialog } = useNotifications();
   const [isLoading, setIsLoading] = useState(false);
   const [inventoryWarning, setInventoryWarning] = useState(false);
   const [lowStockItems, setLowStockItems] = useState([]);
@@ -78,7 +80,7 @@ const useSaleProcessor = ({
         if (onError) {
           onError(error.message || "Ha ocurrido un error al procesar la venta");
         } else {
-          Alert.alert(
+          showError(
             "Error",
             error.message || "Ha ocurrido un error al procesar la venta"
           );
@@ -188,7 +190,7 @@ const useSaleProcessor = ({
         if (onError) {
           onError(error.message || "Ha ocurrido un error al procesar la venta");
         } else {
-          Alert.alert(
+          showError(
             "Error",
             error.message || "Ha ocurrido un error al procesar la venta"
           );

@@ -16,6 +16,7 @@ import * as FileSystem from "expo-file-system";
 import ModalTemplate from "./modalTemplate";
 import { Services, Components } from "../api";
 import { NGROK_HOST } from "@env";
+import useNotifications from "../hooks/useNotifications";
 
 const { ImageWithAuth } = Components;
 
@@ -29,6 +30,7 @@ const FileUploader = ({
   previewStyle,
 }) => {
   const { themeObject } = useTheme();
+  const { showError, showSuccess, showConfirmDialog } = useNotifications();
   const [confirmDeleteModalVisible, setConfirmDeleteModalVisible] =
     useState(false);
   const [fileIndexToDelete, setFileIndexToDelete] = useState(null);
@@ -138,7 +140,7 @@ const FileUploader = ({
       }
     } catch (err) {
       console.error("[DEBUG] Error en handleUpload:", err);
-      Alert.alert("Error", "Error al seleccionar el archivo");
+      showError("Error", "Error al seleccionar el archivo");
     }
   };
 
@@ -415,7 +417,7 @@ const FileUploader = ({
             "[FileUploader] Error específico de descarga:",
             downloadError
           );
-          Alert.alert(
+          showError(
             "Error",
             "No se pudo descargar el archivo. Detalles: " +
               downloadError.message
@@ -424,7 +426,7 @@ const FileUploader = ({
       }
     } catch (error) {
       console.error("[DEBUG] Error al descargar archivo:", error);
-      Alert.alert(
+      showError(
         "Error",
         "No se pudo descargar el archivo. Intente nuevamente."
       );

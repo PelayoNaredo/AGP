@@ -11,6 +11,23 @@ export const InventoryCard = ({ data, theme, navigation }) => {
   const isLargeScreen = width > 768;
   const isMediumScreen = width > 400;
 
+  // Verificación defensiva para evitar errores si data es undefined
+  if (!data || !data.categorias) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.card }]}>
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: theme.text }]}>Inventario</Text>
+          <Ionicons name="cube-outline" size={24} color={theme.primary} />
+        </View>
+        <View style={styles.loadingContainer}>
+          <Text style={[styles.loadingText, { color: theme.textSecondary }]}>
+            Cargando datos del inventario...
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   // Datos para el gráfico de pastel
   const chartData = [
     {
@@ -305,5 +322,15 @@ const styles = StyleSheet.create({
   centerLabelSubtext: {
     fontSize: 14,
     fontWeight: "500",
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 100,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontStyle: "italic",
   },
 });

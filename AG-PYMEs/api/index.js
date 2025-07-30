@@ -4,12 +4,16 @@
 import { BaseStorage, TokenStorage, ImageStorage } from "./services/storage";
 import AuthService from "./services/authService";
 import FileService from "./services/file";
+
+// Importar servicio de alertas con cache
 import {
-  getAlertById,
   getAlerts,
+  getAlertById,
   createAlert,
   updateAlert,
   deleteAlert,
+  invalidateAlertsCache,
+  preloadAlerts,
 } from "./services/alertsService";
 import {
   getAllAppointments,
@@ -30,7 +34,11 @@ import {
   updateClient,
   deleteClient,
 } from "./services/clientsService";
-import { getDashboardData } from "./services/dashboardService";
+import {
+  getDashboardData,
+  invalidateDashboardCache,
+  getDashboardCacheStats,
+} from "./services/dashboardService";
 import {
   getAllEmployees,
   getEmployeeById,
@@ -116,6 +124,7 @@ import {
   getAllShifts,
   getShiftById,
   getShiftByDate,
+  getShiftsByMonth,
   saveShift,
   deleteShift,
   deleteShiftInterval,
@@ -149,6 +158,9 @@ const Services = {
       create: createAlert,
       update: updateAlert,
       delete: deleteAlert,
+      // Nuevas funciones optimizadas
+      invalidateCache: invalidateAlertsCache,
+      preload: preloadAlerts,
     }, //Servicio de citas
     Appointments: {
       getAll: getAllAppointments,
@@ -173,6 +185,8 @@ const Services = {
     //Servicio del dashboard
     Dashboard: {
       getData: getDashboardData,
+      invalidateCache: invalidateDashboardCache,
+      getCacheStats: getDashboardCacheStats,
     },
     //Servicio de empleados
     Employees: {
@@ -268,6 +282,7 @@ const Services = {
       getAll: getAllShifts,
       getById: getShiftById,
       getByDate: getShiftByDate,
+      getByMonth: getShiftsByMonth,
       save: saveShift,
       delete: deleteShift,
       deleteInterval: deleteShiftInterval,
@@ -447,9 +462,11 @@ export {
   updateSetting,
 
   // Turnos
+  // Turnos
   getAllShifts,
   getShiftById,
   getShiftByDate,
+  getShiftsByMonth,
   saveShift,
   deleteShift,
   deleteShiftInterval,
@@ -476,7 +493,6 @@ export default {
   Services,
   Components,
   initialize: async () => {
-    console.log("Inicializando servicios...");
     try {
       // Aquí puedes añadir lógica de inicialización si es necesaria
       return true;

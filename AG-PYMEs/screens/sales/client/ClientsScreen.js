@@ -1,12 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  Pressable,
-  Alert,
-} from "react-native";
+import { View, Text, StyleSheet, FlatList, Pressable } from "react-native";
 import { useTheme } from "../../../context/ThemeContext";
 import { ActivityIndicator, Card, IconButton } from "react-native-paper";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +7,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import ClientModal from "./ClientModal";
 import ClientInfoComponent from "./ClientInfoComponent";
 import SearchHeaderBar from "../../../components/searchHeaderBar";
+import useNotifications from "../../../hooks/useNotifications";
 import ModalTemplate from "../../../components/modalTemplate";
 import PopupMenu, {
   MenuItem,
@@ -24,6 +18,7 @@ import { Services } from "../../../api/index";
 // Componente ClientsScreen para gestionar y visualizar clientes
 const ClientsScreen = () => {
   const { themeObject } = useTheme();
+  const { showError, showSuccess, showConfirmDialog } = useNotifications();
   const [clients, setClients] = useState([]);
   const [filteredClients, setFilteredClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +59,7 @@ const ClientsScreen = () => {
       console.error("Error al cargar clientes:", error);
       setClients([]);
       setFilteredClients([]);
-      Alert.alert("Error", "No se pudieron cargar los clientes");
+      showError("Error", "No se pudieron cargar los clientes");
     } finally {
       setLoading(false);
     }
@@ -120,7 +115,7 @@ const ClientsScreen = () => {
 
       // Actualizar el estado local tras eliminar correctamente
       setClients(clients.filter((client) => client.id_cliente !== clientId));
-      Alert.alert("Éxito", "Cliente eliminado correctamente");
+      showSuccess("Cliente eliminado correctamente");
     } catch (error) {
       console.error("Error al eliminar cliente:", error);
 
@@ -131,7 +126,7 @@ const ClientsScreen = () => {
           "Este cliente tiene ventas u otros registros asociados."
         );
       } else {
-        Alert.alert("Error", "No se pudo eliminar el cliente");
+        showError("Error", "No se pudo eliminar el cliente");
       }
     } finally {
       setLoading(false);
@@ -141,7 +136,7 @@ const ClientsScreen = () => {
   // Función para manejar la vista del historial de compras del cliente (TODO)
   const handleViewClientHistory = (client) => {
     // Navegar a la vista de historial del cliente
-    Alert.alert("Información", "Función de historial pendiente de implementar");
+    showInfo("Función de historial pendiente de implementar");
     closeMenu(client.id_cliente);
   };
 

@@ -17,13 +17,11 @@ export const getHeaders = async (isUpload = false) => {
 
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
-    } else {
-      console.warn("[DEBUG] No hay token disponible para la petición");
     }
 
     return headers;
   } catch (error) {
-    console.error("[ERROR] Error al obtener headers:", error);
+    console.error("Error al obtener headers:", error);
     return isUpload ? fileUploadHeaders : defaultHeaders;
   }
 };
@@ -37,6 +35,7 @@ export const httpFetch = async (
     const url = endpoint.startsWith("http")
       ? endpoint
       : `${baseURL}${endpoint}`;
+
     const headers = await getHeaders(isUpload);
 
     const config = {
@@ -46,7 +45,6 @@ export const httpFetch = async (
     };
 
     if (body) {
-      // Si el cuerpo ya es un string (ya está serializado) no lo serializa de nuevo
       config.body = isUpload
         ? body
         : typeof body === "string"
@@ -55,15 +53,24 @@ export const httpFetch = async (
     }
 
     const response = await fetch(url, config);
-    return await handleResponse(response);
+
+    if (!response.ok) {
+      }
+
+    const result = await handleResponse(response);
+    return result;
   } catch (error) {
-    console.error(`Error en httpFetch (intento ${retryCount + 1}):`, error);
+    console.error(
+      `Error (attempt ${retryCount + 1}) for ${endpoint}:`,
+      error.message
+    );
 
     if (
       (error.message.includes("network") ||
         error.message.includes("Failed to fetch")) &&
       retryCount < MAX_RETRIES
     ) {
+      console.log(`Retrying... (${retryCount + 1}/${MAX_RETRIES})`);
       await wait(RETRY_DELAY * (retryCount + 1));
       return httpFetch(endpoint, { method, body, isUpload }, retryCount + 1);
     }

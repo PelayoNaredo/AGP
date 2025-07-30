@@ -234,19 +234,10 @@ const SalesPointScreen = () => {
                   <ClientSelector
                     client={selectedClient}
                     onSelectClient={() => {
-                      console.log(
-                        "🔔 SalesPointScreen: Client selector button pressed"
-                      );
                       setNewClientMode(false);
                       setIsClientModalVisible(true);
-                      console.log(
-                        "🔔 SalesPointScreen: Modal visibility set to true"
-                      );
-                    }}
+                      }}
                     onAddNewClient={() => {
-                      console.log(
-                        "🔔 SalesPointScreen: Add new client button pressed"
-                      );
                       setNewClientMode(true);
                       setIsClientModalVisible(true);
                     }}

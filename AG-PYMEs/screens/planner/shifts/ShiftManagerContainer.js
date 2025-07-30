@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Services } from "../../../api/index";
+import { useUnifiedCache } from "../../../cache/hooks/useUnifiedCache";
 
 // Maneja la lógica de la pantalla de gestión de turnos
 const ShiftManagerContainer = ({ children }) => {
@@ -9,6 +10,14 @@ const ShiftManagerContainer = ({ children }) => {
   const [shifts, setShifts] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Hook del cache unificado (compatible con API anterior)
+  const {
+    getEmployees,
+    getShiftsByDate,
+    invalidateShifts,
+    isLoading: isCacheLoading,
+  } = useUnifiedCache();
 
   // Obtener el lunes de la semana de una fecha
   function getMonday(date) {
@@ -83,18 +92,20 @@ const ShiftManagerContainer = ({ children }) => {
     );
   };
 
-  // Cargar datos iniciales
+  // Cargar datos iniciales con cache optimizado
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
+
+        const dateStr = formatPostgresDate(
+          selectedView === "semana" ? selectedDate : getMonday(selectedDate)
+        );
+
+        // Usar cache inteligente para cargar datos
         const [employeesData, shiftsData] = await Promise.all([
-          Services.Data.Employees.getAll(),
-          Services.Data.Shifts.getByDate(
-            formatPostgresDate(
-              selectedView === "semana" ? selectedDate : getMonday(selectedDate)
-            )
-          ),
+          getEmployees(), // Cache de 30 min
+          getShiftsByDate(dateStr), // Cache de 10 min
         ]);
 
         const transformedShifts = transformShifts(shiftsData);
@@ -106,6 +117,7 @@ const ShiftManagerContainer = ({ children }) => {
         setEmployees(employeesData);
         setShifts(initializedShifts);
       } catch (err) {
+        console.error("Error loading shifts data:", err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -113,7 +125,7 @@ const ShiftManagerContainer = ({ children }) => {
     };
 
     loadData();
-  }, [selectedDate, selectedView]);
+  }, [selectedDate, selectedView, getEmployees, getShiftsByDate]); // Dependencias optimizadas
 
   // Guardar cambios en un turno
   const handleSaveShift = async (employeeId, dayNumber, shiftData) => {
@@ -141,7 +153,11 @@ const ShiftManagerContainer = ({ children }) => {
           },
         },
       }));
+
+      // Invalidar cache de shifts para refrescar datos
+      await invalidateShifts();
     } catch (err) {
+      console.error("Error saving shift:", err);
       setError(err.message);
     }
   };
@@ -175,7 +191,11 @@ const ShiftManagerContainer = ({ children }) => {
           },
         },
       }));
+
+      // Invalidar cache de shifts para refrescar datos
+      await invalidateShifts();
     } catch (err) {
+      console.error("Error deleting shift:", err);
       setError(err.message);
     }
   };

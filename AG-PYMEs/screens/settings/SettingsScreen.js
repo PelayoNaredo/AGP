@@ -14,7 +14,7 @@ import LogoUploader from "./LogoUploader";
 import TimePickerSection from "./TimePickerSection";
 import ThemeSelector from "./ThemeSelector";
 import CustomButton from "../../components/customButton";
-import useSettings from "../../hooks/useSettings";
+import useSettingsWithCache from "../../hooks/useSettings";
 
 // Principal componente de configuración
 const SettingsScreen = () => {
@@ -23,7 +23,7 @@ const SettingsScreen = () => {
   const { showConfirmDialog, showSuccess, showErrorNotification } =
     useNotifications();
   const { settings, isLoading, hasChanges, handleChange, saveSettings } =
-    useSettings();
+    useSettingsWithCache();
 
   const handleThemeChange = (theme) => {
     handleChange("tema", theme);

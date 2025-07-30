@@ -4,7 +4,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   Dimensions,
-  Alert,
   Text,
 } from "react-native";
 import { Card, IconButton } from "react-native-paper";
@@ -12,6 +11,7 @@ import { useTheme } from "../../context/ThemeContext";
 import FileUploader from "../../components/fileUploader";
 import { Services } from "../../api/index";
 import LogoImage from "../../components/LogoImage";
+import useNotifications from "../../hooks/useNotifications";
 
 const { width } = Dimensions.get("window");
 const LOGO_SIZE = width * 0.2;
@@ -22,6 +22,7 @@ const ALLOWED_TYPES = ["image/jpeg", "image/png"];
 // Componente LogoUploader permite subir un logo para la empresa
 const LogoUploader = ({ onLogoChange, currentLogo }) => {
   const { themeObject } = useTheme();
+  const { showError, showSuccess, showConfirmDialog } = useNotifications();
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -70,7 +71,7 @@ const LogoUploader = ({ onLogoChange, currentLogo }) => {
           "Error de autenticación. Por favor, inicie sesión nuevamente.";
       }
 
-      Alert.alert("Error", errorMessage);
+      showError("Error", errorMessage);
       setError(errorMessage);
     } finally {
       setIsUploading(false);

@@ -2,7 +2,7 @@ import React, { useState, useRef } from "react";
 import { View, ScrollView, StyleSheet } from "react-native";
 import { DatePickerModal } from "react-native-paper-dates";
 import { useTheme } from "../../../context/ThemeContext";
-import useSettings from "../../../hooks/useSettings";
+import useSettingsWithCache from "../../../hooks/useSettings";
 import { NotificationProvider } from "../../../context/NotificationContext";
 import AppointmentManagerContainer from "./AppointmentManagerContainer";
 import AppointmentHeader from "./AppointmentHeader";
@@ -13,7 +13,7 @@ import AppointmentModal from "./AppointmentModal";
 // Componente principal de la pantalla de citas
 const AppointmentsScreen = () => {
   const { themeObject } = useTheme();
-  const { settings, isLoading: settingsLoading } = useSettings();
+  const { settings, isLoading: settingsLoading } = useSettingsWithCache();
   const scrollViewRef = useRef(null);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState(null);

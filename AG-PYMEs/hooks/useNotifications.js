@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useNotification as useGlobalNotification } from "../context/NotificationContext";
+import { useNotifications as useGlobalNotification } from "../context/NotificationContext";
 
 //Hook personalizado para gestionar notificaciones y mensajes al usuario
 const useNotifications = () => {
@@ -7,17 +7,17 @@ const useNotifications = () => {
   //Muestra un mensaje en el snackbar
   const showSnackbar = useCallback(
     (message, type = "info", duration = 3000) => {
-      notification.showNotification(message, { type, duration });
+      notification.showNotification(message, type, { duration });
     },
     [notification]
   );
 
   //Oculta el snackbar
   const hideSnackbar = useCallback(() => {
-    notification.hideNotification();
+    notification.clearAllNotifications();
   }, [notification]);
 
-  //Muestra una alerta de confirmación
+  //Muestra una alerta de confirmación (snackbar para casos simples, Alert para críticos)
   const showConfirmDialog = useCallback(
     (
       title,
@@ -25,17 +25,17 @@ const useNotifications = () => {
       onConfirm,
       onCancel = () => {},
       confirmText = "Confirmar",
-      cancelText = "Cancelar"
+      cancelText = "Cancelar",
+      critical = false // Pasar true para acciones destructivas como eliminar
     ) => {
-      // Ahora usamos el nuevo sistema de notificaciones con soporte para confirmar/cancelar
-      notification.showConfirmDeny(
-        `${title}: ${message}`,
+      notification.showConfirmDialog(
+        title,
+        message,
         onConfirm,
         onCancel,
-        {
-          confirmText,
-          cancelText,
-        }
+        confirmText,
+        cancelText,
+        critical
       );
     },
     [notification]
@@ -45,7 +45,6 @@ const useNotifications = () => {
   const showError = useCallback(
     (title, message, onPress = () => {}) => {
       notification.showError(`${title}: ${message}`);
-      // No es posible manejar el onPress con el sistema actual de notificaciones
     },
     [notification]
   );
@@ -66,18 +65,57 @@ const useNotifications = () => {
     [notification]
   );
 
+  // Funciones de conveniencia para confirmaciones específicas
+  const showDeleteConfirm = useCallback(
+    (itemName, onConfirm, onCancel = () => {}) => {
+      showConfirmDialog(
+        "Confirmar eliminación",
+        `¿Estás seguro de que deseas eliminar "${itemName}"? Esta acción no se puede deshacer.`,
+        onConfirm,
+        onCancel,
+        "Eliminar",
+        "Cancelar",
+        true // Crítico = true para usar Alert nativo
+      );
+    },
+    [showConfirmDialog]
+  );
+
+  const showSimpleConfirm = useCallback(
+    (title, message, onConfirm, onCancel = () => {}) => {
+      showConfirmDialog(
+        title,
+        message,
+        onConfirm,
+        onCancel,
+        "Confirmar",
+        "Cancelar",
+        false // No crítico = usar snackbar
+      );
+    },
+    [showConfirmDialog]
+  );
+
   return {
+    // Funciones principales de snackbar
     showSnackbar,
     hideSnackbar,
-    showConfirmDialog,
     showError,
     showSuccess,
     showErrorNotification,
 
-    // Nuevos métodos del sistema global
+    // Confirmaciones inteligentes
+    showConfirmDialog, // Usa snackbar o Alert según criticidad
+    showDeleteConfirm, // Para eliminaciones (usa Alert crítico)
+    showSimpleConfirm, // Para confirmaciones simples (usa snackbar)
+
+    // Métodos disponibles del sistema global
     showWarning: notification.showWarning,
-    showPersistent: notification.showPersistent,
-    showConfirmDeny: notification.showConfirmDeny,
+    showInfo: notification.showInfo,
+    showAlert: notification.showAlert, // Ahora usa snackbar por defecto
+    showConfirmation: notification.showConfirmation, // Alert nativo tradicional
+    showErrorWithRetry: notification.showErrorWithRetry,
+    showNativeAlert: notification.showNativeAlert, // Para casos críticos
   };
 };
 

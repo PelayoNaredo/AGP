@@ -777,7 +777,9 @@ const AppointmentModal = ({
                   : "✗ Profesional no disponible en este horario"}
               </Text>
 
-              {error && error.includes("cita(s) programada(s)") && (
+              {error &&
+              typeof error === "string" &&
+              error.includes("cita(s) programada(s)") ? (
                 <Text
                   style={[
                     styles.reservationsInfo,
@@ -789,7 +791,7 @@ const AppointmentModal = ({
                 >
                   {error}
                 </Text>
-              )}
+              ) : null}
             </View>
           )}
         </View>

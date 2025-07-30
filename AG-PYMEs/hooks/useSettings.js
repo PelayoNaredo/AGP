@@ -1,10 +1,15 @@
 import { useState, useEffect } from "react";
 import { useTheme } from "../context/ThemeContext";
-import { Alert, Platform } from "react-native";
+import { useUnifiedCache } from "../cache/hooks/useUnifiedCache";
+import { Platform, Alert } from "react-native";
 import { Services } from "../api/index";
+import useNotifications from "./useNotifications";
 
-const useSettings = () => {
+const useSettingsWithCache = () => {
   const { theme, toggleTheme } = useTheme();
+  const { get, invalidate } = useUnifiedCache();
+  const { showError, showSuccess, showSimpleConfirm } = useNotifications();
+
   const [settings, setSettings] = useState({
     nombre_local: "",
     direccion: "",
@@ -19,13 +24,20 @@ const useSettings = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
-  const loadSettings = async () => {
+  // Cargar settings usando cache unificado
+  const loadSettings = async (forceRefresh = false) => {
     setIsLoading(true);
     try {
-      const setting = await Services.Data.Settings.getById(1);
+      // Usar el sistema unificado de cache para obtener settings
+      const setting = await get(
+        "settings_1", // clave única para settings
+        async () => {
+          return await Services.Data.Settings.getById(1);
+        },
+        "settings", // tipo de datos
+        forceRefresh
+      );
+
       if (setting) {
         const newSettings = {
           ...setting,
@@ -48,19 +60,34 @@ const useSettings = () => {
 
         // Si el tema de la API es diferente al tema actual, aplicarlo
         if (newSettings.tema !== theme) {
-          await toggleTheme(newSettings.tema);
-        } // Sincronizar el tema en el almacenamiento local solo como respaldo
-        if (Platform.OS === "web") {
-          localStorage.setItem("appTheme", newSettings.tema);
+          toggleTheme();
         }
-        await Services.Storage.Base.setItem("appTheme", newSettings.tema);
       }
     } catch (error) {
-      console.error("Error cargando configuración:", error);
+      console.error(" [SETTINGS] Error loading settings:", error);
     } finally {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadSettings();
+  }, []); // Array vacío para cargar solo una vez
+
+  // Detectar cambios en settings
+  useEffect(() => {
+    if (initialSettings) {
+      const settingsChanged =
+        JSON.stringify(settings) !== JSON.stringify(initialSettings);
+      setHasChanges(settingsChanged);
+    }
+  }, [settings, initialSettings]);
+
+  const updateSetting = (key, value) => {
+    setSettings((prev) => ({ ...prev, [key]: value }));
+  };
+
+  // Alias para compatibilidad con useSettings
   const handleChange = async (name, value) => {
     const newSettings = {
       ...settings,
@@ -68,10 +95,18 @@ const useSettings = () => {
     };
     setSettings(newSettings);
 
-    // Si el cambio es de tema, actualizarlo y guardar en la API
+    // Si el cambio es de tema, actualizarlo inmediatamente
     if (name === "tema" && value !== theme) {
       try {
-        // Asegurarse de que todos los campos requeridos estén presentes
+        await toggleTheme(value);
+
+        // Guardar en localStorage como respaldo
+        if (Platform.OS === "web") {
+          localStorage.setItem("appTheme", value);
+        }
+        await Services.Storage.Base.setItem("appTheme", value);
+
+        // Actualizar en API en segundo plano
         const settingsToSave = {
           ...newSettings,
           nombre_local: newSettings.nombre_local || "Negocio",
@@ -83,55 +118,61 @@ const useSettings = () => {
           logo_local: newSettings.logo_local || "",
         };
 
-        // Primero aplicar el tema en la aplicación
-        await toggleTheme(value); // Luego actualizar el tema en la API (en segundo plano)
-        Services.Data.Settings.update(1, settingsToSave).catch((err) => {
-          console.error("Error al actualizar tema en API:", err);
-        });
-
-        // Eliminamos la recarga completa de la página
+        Services.Data.Settings.update(1, settingsToSave)
+          .then(() => {
+            // Invalidar cache después de guardar
+            invalidate("settings_1");
+          })
+          .catch((err) => {
+            console.error(" [SETTINGS] Error updating theme in API:", err);
+          });
       } catch (error) {
-        console.error("Error al actualizar el tema:", error);
-        Alert.alert(
-          "Error",
+        console.error(" [SETTINGS] Error applying theme:", error);
+        showError(
+          "Error de tema",
           "No se pudo actualizar el tema. Por favor, inténtalo de nuevo."
         );
       }
     }
-
-    if (initialSettings) {
-      setHasChanges(
-        JSON.stringify(newSettings) !==
-          JSON.stringify({
-            ...initialSettings,
-            tema: newSettings.tema,
-          })
-      );
-    }
   };
+
   const validateFields = () => {
     if (!settings.nombre_local || !settings.nombre_local.trim()) {
-      Alert.alert("Error", "El nombre del local es requerido");
+      showError("Error", "El nombre del local es requerido");
       return false;
     }
     if (!settings.direccion || !settings.direccion.trim()) {
-      Alert.alert("Error", "La dirección es requerida");
+      showError("Error", "La dirección es requerida");
       return false;
     }
     if (!settings.telefono || !settings.telefono.trim()) {
-      Alert.alert("Error", "El teléfono es requerido");
+      showError("Error", "El teléfono es requerido");
       return false;
     }
     return true;
   };
+
+  const resetSettings = () => {
+    if (initialSettings) {
+      setSettings(initialSettings);
+    }
+  };
+
   const saveSettings = async () => {
-    if (!validateFields()) return;
+    if (!hasChanges) {
+      return true;
+    }
+
+    // Validar campos antes de guardar
+    if (!validateFields()) {
+      return false;
+    }
 
     setIsLoading(true);
     try {
+      // Preparar settings para guardar con valores por defecto
       const settingsToSave = {
         ...settings,
-        // Asegurarnos de que todas las propiedades tengan valores válidos
         nombre_local: settings.nombre_local || "Negocio",
         direccion: settings.direccion || "Dirección",
         telefono: settings.telefono || "Teléfono",
@@ -141,48 +182,88 @@ const useSettings = () => {
         logo_local: settings.logo_local || "",
         tema: settings.tema || "claro",
       };
+
+      // Verificar si es una actualización o creación
       const existingSetting = await Services.Data.Settings.getById(1);
       if (existingSetting) {
-        // Enviamos el objeto completo de configuración
         await Services.Data.Settings.update(1, settingsToSave);
       } else {
         await Services.Data.Settings.create(settingsToSave);
       }
 
+      // Invalidar cache unificado para forzar actualización
+      await invalidate("settings_1");
+
+      // Actualizar settings iniciales
       setInitialSettings(settingsToSave);
       setHasChanges(false);
 
-      // Asegurarse de que el tema esté sincronizado después de guardar
+      // Asegurar sincronización de tema
       if (settingsToSave.tema && settingsToSave.tema !== theme) {
         await toggleTheme(settingsToSave.tema);
       }
 
-      // Guardar en localStorage solo como respaldo
+      // Guardar en localStorage como respaldo
       if (Platform.OS === "web" && settingsToSave.tema) {
         localStorage.setItem("appTheme", settingsToSave.tema);
       }
-      Alert.alert("Éxito", "Configuración guardada correctamente");
 
-      // Aplicar el tema sin recargar la página
-      // Nota: Eliminamos la recarga completa de la página
+      showSuccess("Configuración guardada correctamente");
+      return true;
     } catch (error) {
-      console.error("Error guardando ajustes:", error);
-      Alert.alert(
+      console.error(" [SETTINGS] Error saving settings:", error);
+      showError(
         "Error",
         error.message || "No se pudo guardar la configuración"
       );
+      throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
+  const showUnsavedChangesAlert = () => {
+    return new Promise((resolve) => {
+      if (!hasChanges) {
+        resolve(true);
+        return;
+      }
+
+      showSimpleConfirm(
+        "Cambios sin guardar",
+        "Tienes cambios sin guardar. ¿Qué deseas hacer?",
+        // onConfirm - Guardar
+        async () => {
+          try {
+            await saveSettings();
+            resolve(true);
+          } catch (error) {
+            resolve(false);
+          }
+        },
+        // onCancel - Cancelar
+        () => resolve(false)
+      );
+    });
+  };
+
+  // Función para refrescar settings forzando actualización
+  const refreshSettings = async () => {
+    await loadSettings(true);
+  };
+
   return {
     settings,
-    handleChange,
-    saveSettings,
     isLoading,
     hasChanges,
+    updateSetting,
+    handleChange, // Alias para compatibilidad con useSettings
+    resetSettings,
+    saveSettings,
+    showUnsavedChangesAlert,
+    refreshSettings,
+    loadSettings,
   };
 };
 
-export default useSettings;
+export default useSettingsWithCache;

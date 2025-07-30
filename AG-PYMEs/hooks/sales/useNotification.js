@@ -1,4 +1,4 @@
-import { useNotification as useGlobalNotification } from "../../context/NotificationContext";
+import { useNotifications as useGlobalNotification } from "../../context/NotificationContext";
 
 /**
  * Hook personalizado para manejar notificaciones usando el contexto global de notificaciones
@@ -10,7 +10,7 @@ const useNotification = () => {
 
   // Muestra una notificación tipo snackbar
   const showNotification = (message, type = "info") => {
-    globalNotification.showNotification(message, { type });
+    globalNotification.showNotification(message, type);
   };
 
   // Muestra una notificación de éxito
@@ -34,7 +34,7 @@ const useNotification = () => {
 
   // Oculta la notificación snackbar
   const hideSnackbar = () => {
-    globalNotification.hideNotification();
+    globalNotification.clearAllNotifications();
   };
   // Para mantener compatibilidad con el código existente
   return {
@@ -49,9 +49,10 @@ const useNotification = () => {
 
     // Nuevos métodos del sistema global
     showWarning: globalNotification.showWarning,
-    showConfirm: globalNotification.showConfirm,
-    showConfirmDeny: globalNotification.showConfirmDeny,
-    showPersistent: globalNotification.showPersistent,
+    showInfo: globalNotification.showInfo,
+    showAlert: globalNotification.showAlert,
+    showConfirmation: globalNotification.showConfirmation,
+    showErrorWithRetry: globalNotification.showErrorWithRetry,
   };
 };
 

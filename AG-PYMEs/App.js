@@ -10,6 +10,7 @@ import CustomBottomTabs from "./navigation/AppNavigator";
 import { AuthProvider, useAuth } from "./context/AuthContext.js";
 import { ThemeProvider, useTheme } from "./context/ThemeContext.js";
 import { NotificationProvider } from "./context/NotificationContext";
+import { GlobalCacheProvider } from "./cache/providers/GlobalCacheProvider.js";
 import LoginScreen from "./screens/LoginRegisterScreen.js";
 import { configureDatePicker } from "./utils/datePickerConfig";
 
@@ -96,14 +97,39 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <NotificationProvider>
-          <SafeAreaProvider
-            style={{
-              flex: 1,
+          <GlobalCacheProvider
+            config={{
+              defaultStrategy: "ttl",
+              maxMemoryUsage: 50 * 1024 * 1024, // 50MB
+              cleanupInterval: 300000, // 5 minutos
+              enableMetrics: true,
+              logLevel: __DEV__ ? "debug" : "warn",
+              strategies: {
+                ttl: {
+                  defaultTTL: 10 * 60 * 1000, // 10 minutos
+                  maxEntries: 1000,
+                },
+                bulkLoading: {
+                  compression: true,
+                  maxBatchSize: 100,
+                },
+                intelligent: {
+                  adaptiveTTL: true,
+                  patternAnalysis: true,
+                  staleWhileRevalidate: true,
+                },
+              },
             }}
           >
-            <ThemedStatusBar />
-            <MainApp />
-          </SafeAreaProvider>
+            <SafeAreaProvider
+              style={{
+                flex: 1,
+              }}
+            >
+              <ThemedStatusBar />
+              <MainApp />
+            </SafeAreaProvider>
+          </GlobalCacheProvider>
         </NotificationProvider>
       </AuthProvider>
     </ThemeProvider>

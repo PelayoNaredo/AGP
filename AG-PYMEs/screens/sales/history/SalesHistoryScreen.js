@@ -1,12 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  Pressable,
-  Alert,
-} from "react-native";
+import { View, Text, StyleSheet, FlatList, Pressable } from "react-native";
 import { useTheme } from "../../../context/ThemeContext";
 import {
   ActivityIndicator,
@@ -19,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { http } from "../../../api/http";
 import { formatCurrency, formatDateTime } from "../../../utils/helpers";
+import useNotifications from "../../../hooks/useNotifications";
 import CustomPicker from "../../../components/customPicker";
 import DailySalesHeader from "./DailySalesHeader";
 import DailyClosureModal from "./DailyClosureModal";
@@ -31,6 +25,7 @@ import {
 // Componente principal para la pantalla de historial de ventas
 const SalesHistoryScreen = () => {
   const { themeObject } = useTheme();
+  const { showError, showSuccess, showConfirmDialog } = useNotifications();
   const navigation = useNavigation();
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -124,7 +119,7 @@ const SalesHistoryScreen = () => {
       setFilteredSales(salesData);
     } catch (error) {
       console.error("Error al cargar ventas por fecha:", error);
-      Alert.alert(
+      showError(
         "Error",
         "No se pudieron cargar las ventas para la fecha seleccionada"
       );
@@ -227,22 +222,17 @@ const SalesHistoryScreen = () => {
 
       // Si no hay ventas pagadas, mostrar advertencia
       if (dailyTotal <= 0) {
-        Alert.alert(
+        showConfirmDialog(
           "Advertencia",
           "No hay ventas registradas como pagadas para esta fecha. ¿Deseas continuar con el cierre?",
-          [
-            {
-              text: "Cancelar",
-              style: "cancel",
-              onPress: () => setIsClosingLoading(false),
-            },
-            {
-              text: "Continuar",
-              onPress: async () => {
-                await executeClosure(formattedDate, dailyTotal);
-              },
-            },
-          ]
+          // onConfirm
+          async () => {
+            await executeClosure(formattedDate, dailyTotal);
+          },
+          // onCancel
+          () => setIsClosingLoading(false),
+          "Continuar",
+          "Cancelar"
         );
         return;
       }
@@ -250,7 +240,7 @@ const SalesHistoryScreen = () => {
       await executeClosure(formattedDate, dailyTotal);
     } catch (error) {
       console.error("Error en cierre diario:", error);
-      Alert.alert("Error", "No se pudo completar el cierre diario");
+      showError("Error", "No se pudo completar el cierre diario");
     } finally {
       setIsClosingLoading(false);
       setIsDailyClosingModalVisible(false);
@@ -262,15 +252,13 @@ const SalesHistoryScreen = () => {
       const response = await executeDailyClosure(date, total, closingNotes);
 
       if (response) {
-        Alert.alert("Éxito", "Cierre diario realizado correctamente", [
-          { text: "OK" },
-        ]);
+        showSuccess("Cierre diario realizado correctamente");
         setHasDailyClosure(true);
         setClosingNotes("");
       }
     } catch (error) {
       console.error("Error al ejecutar cierre:", error);
-      Alert.alert(
+      showError(
         "Error",
         error.message || "No se pudo completar el cierre diario"
       );
@@ -318,7 +306,7 @@ const SalesHistoryScreen = () => {
       }
     } catch (error) {
       console.error("Error al obtener detalles de la venta:", error);
-      Alert.alert("Error", "No se pudieron cargar los detalles de la venta");
+      showError("Error", "No se pudieron cargar los detalles de la venta");
     }
   };
 

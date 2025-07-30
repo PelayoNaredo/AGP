@@ -1,311 +1,304 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useRef,
-  useCallback,
-} from "react";
-import { StyleSheet, View, Dimensions } from "react-native";
-import { Snackbar, Text, Portal, Button, Surface } from "react-native-paper";
-import { useTheme } from "./ThemeContext";
+import React, { createContext, useContext, useState, useCallback } from "react";
+import { Alert } from "react-native";
 
-// Definimos el contexto
+// Creamos el contexto
 const NotificationContext = createContext();
 
-// Componente Banner personalizado
-const NotificationBanner = ({
-  visible,
-  message,
-  type = "info",
-  action,
-  onDismiss,
-  duration = 4000,
-  isPersistent = false,
-  confirmAction = null,
-  cancelAction = null,
-}) => {
-  const { themeObject } = useTheme();
-  // Obtenemos dimensiones de la pantalla para cálculos de posición
-  const windowHeight = Dimensions.get("window").height;
-
-  const styles = StyleSheet.create({
-    snackbar: {
-      backgroundColor:
-        type === "success"
-          ? themeObject.colors.success || "#4CAF50"
-          : type === "error"
-            ? themeObject.colors.error || "#F44336"
-            : type === "warning"
-              ? themeObject.colors.warning || "#FF9800"
-              : themeObject.colors.info || "#2196F3",
-      position: "absolute",
-      bottom: windowHeight * 0.07,
-      left: 0,
-      right: 0,
-      margin: 8,
-    },
-    content: {
-      flexDirection: "row",
-      alignItems: "center",
-      flex: 1,
-    },
-    message: {
-      color: "#FFFFFF",
-      flex: 1,
-    },
-    actionButton: {
-      color: "#FFFFFF",
-      marginLeft: 8,
-    },
-    actionsContainer: {
-      flexDirection: "row",
-      justifyContent: "flex-end",
-    },
-  });
-  // Si es una notificación de confirmación (con botones aceptar/cancelar)
-  if (isPersistent && confirmAction && cancelAction) {
-    return (
-      <Portal>
-        <Snackbar
-          visible={visible}
-          onDismiss={() => {}} // No permitimos descartar con tap fuera
-          duration={Infinity} // Permanece hasta que el usuario interactúa
-          style={styles.snackbar}
-          wrapperStyle={{ position: "absolute" }} // Necesario para posicionar correctamente
-        >
-          <View style={styles.content}>
-            <Text style={styles.message}>{message}</Text>
-            <View style={styles.actionsContainer}>
-              <Button
-                onPress={() => {
-                  cancelAction.onPress();
-                  onDismiss();
-                }}
-                labelStyle={styles.actionButton}
-              >
-                {cancelAction.label}
-              </Button>
-              <Button
-                onPress={() => {
-                  confirmAction.onPress();
-                  onDismiss();
-                }}
-                labelStyle={styles.actionButton}
-              >
-                {confirmAction.label}
-              </Button>
-            </View>
-          </View>
-        </Snackbar>
-      </Portal>
-    );
-  }
-  // Notificación estándar con un solo botón opcional
-  return (
-    <Portal>
-      <Snackbar
-        visible={visible}
-        onDismiss={onDismiss}
-        duration={isPersistent ? Infinity : duration}
-        style={styles.snackbar}
-        wrapperStyle={{ position: "absolute" }} // Necesario para posicionar correctamente
-        action={
-          action && {
-            label: action.label,
-            onPress: () => {
-              action.onPress();
-              onDismiss();
-            },
-            labelStyle: styles.actionButton,
-          }
-        }
-      >
-        <View style={styles.content}>
-          <Text style={styles.message}>{message}</Text>
-        </View>
-      </Snackbar>
-    </Portal>
-  );
+// Tipos de notificación permitidos
+export const NOTIFICATION_TYPES = {
+  SUCCESS: "success",
+  ERROR: "error",
+  WARNING: "warning",
+  INFO: "info",
 };
 
-// Proveedor del contexto
+// Configuración por defecto para notificaciones
+const DEFAULT_NOTIFICATION_CONFIG = {
+  autoHide: true,
+  duration: 4000, // 4 segundos
+  position: "top", // top, bottom, center
+};
+
 export const NotificationProvider = ({ children }) => {
-  const [visible, setVisible] = useState(false);
-  const [message, setMessage] = useState("");
-  const [type, setType] = useState("info"); // 'info', 'success', 'error', 'warning'
-  const [action, setAction] = useState(null);
-  const [duration, setDuration] = useState(4000); // Duración predeterminada
-  const [isPersistent, setIsPersistent] = useState(false);
-  const [confirmAction, setConfirmAction] = useState(null);
-  const [cancelAction, setCancelAction] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [nextId, setNextId] = useState(1);
 
-  // Cola de notificaciones
-  const notificationQueue = useRef([]);
-  const isShowingNotification = useRef(false);
-  // Mostrar la siguiente notificación en la cola
-  const showNextNotification = useCallback(() => {
-    if (
-      notificationQueue.current.length > 0 &&
-      !isShowingNotification.current
-    ) {
-      const nextNotification = notificationQueue.current.shift();
+  // Función para mostrar una notificación
+  const showNotification = useCallback(
+    (message, type = NOTIFICATION_TYPES.INFO, config = {}) => {
+      const finalConfig = { ...DEFAULT_NOTIFICATION_CONFIG, ...config };
+      const id = nextId;
 
-      setMessage(nextNotification.message);
-      setType(nextNotification.type || "info");
-      setAction(nextNotification.action || null);
-      setDuration(nextNotification.duration || 4000);
-      setIsPersistent(nextNotification.isPersistent || false);
-      setConfirmAction(nextNotification.confirmAction || null);
-      setCancelAction(nextNotification.cancelAction || null);
+      const notification = {
+        id,
+        message,
+        type,
+        timestamp: Date.now(),
+        ...finalConfig,
+      };
 
-      isShowingNotification.current = true;
-      setVisible(true);
-    }
+      setNotifications((prev) => [...prev, notification]);
+      setNextId((prev) => prev + 1);
+
+      // Auto-hide la notificación si está configurado
+      if (finalConfig.autoHide) {
+        setTimeout(() => {
+          hideNotification(id);
+        }, finalConfig.duration);
+      }
+
+      return id;
+    },
+    [nextId]
+  );
+
+  // Función para ocultar una notificación específica
+  const hideNotification = useCallback((id) => {
+    setNotifications((prev) => prev.filter((notif) => notif.id !== id));
   }, []);
 
-  // Ocultar la notificación actual
-  const hideNotification = useCallback(() => {
-    setVisible(false);
-    isShowingNotification.current = false;
+  // Función para limpiar todas las notificaciones
+  const clearAllNotifications = useCallback(() => {
+    setNotifications([]);
+  }, []);
 
-    // Pequeño retraso antes de mostrar la siguiente notificación
-    setTimeout(() => {
-      showNextNotification();
-    }, 300);
-  }, [showNextNotification]);
-
-  // Agregar una notificación a la cola
-  const enqueueNotification = useCallback(
-    (notificationOptions) => {
-      notificationQueue.current.push(notificationOptions);
-
-      if (!isShowingNotification.current) {
-        showNextNotification();
-      }
-    },
-    [showNextNotification]
-  );
-
-  // API pública
-  const showNotification = useCallback(
-    (message, options = {}) => {
-      enqueueNotification({
-        message,
-        type: options.type || "info",
-        action: options.action,
-        duration: options.duration || 4000,
-      });
-    },
-    [enqueueNotification]
-  );
-
+  // Funciones de conveniencia para diferentes tipos
   const showSuccess = useCallback(
-    (message, options = {}) => {
-      showNotification(message, { ...options, type: "success" });
-    },
+    (message, config = {}) =>
+      showNotification(message, NOTIFICATION_TYPES.SUCCESS, config),
     [showNotification]
   );
 
   const showError = useCallback(
-    (message, options = {}) => {
-      showNotification(message, { ...options, type: "error" });
-    },
+    (message, config = {}) =>
+      showNotification(message, NOTIFICATION_TYPES.ERROR, {
+        ...config,
+        duration: config.duration || 6000, // Los errores duran más tiempo
+      }),
     [showNotification]
   );
 
   const showWarning = useCallback(
-    (message, options = {}) => {
-      showNotification(message, { ...options, type: "warning" });
-    },
-    [showNotification]
-  );
-  const showConfirm = useCallback(
-    (message, onConfirm, options = {}) => {
-      showNotification(message, {
-        ...options,
-        type: options.type || "info",
-        action: {
-          label: options.confirmText || "Confirmar",
-          onPress: onConfirm,
-        },
-      });
-    },
+    (message, config = {}) =>
+      showNotification(message, NOTIFICATION_TYPES.WARNING, config),
     [showNotification]
   );
 
-  // Nuevo método para mostrar notificación persistente con botones de aceptar/cancelar
-  const showConfirmDeny = useCallback(
-    (message, onConfirm, onCancel, options = {}) => {
-      enqueueNotification({
-        message,
-        type: options.type || "info",
-        isPersistent: true,
-        confirmAction: {
-          label: options.confirmText || "Aceptar",
-          onPress: onConfirm,
-        },
-        cancelAction: {
-          label: options.cancelText || "Cancelar",
-          onPress: onCancel || (() => {}),
-        },
-        duration: Infinity, // Duración infinita hasta que el usuario interactúe
-      });
-    },
-    [enqueueNotification]
+  const showInfo = useCallback(
+    (message, config = {}) =>
+      showNotification(message, NOTIFICATION_TYPES.INFO, config),
+    [showNotification]
   );
 
-  // Método para mostrar notificación persistente
-  const showPersistent = useCallback(
-    (message, options = {}) => {
-      enqueueNotification({
-        message,
-        type: options.type || "info",
-        isPersistent: true,
-        action: options.action,
-        duration: Infinity,
+  // Función para mostrar alertas como snackbar (preferido sobre Alert nativo)
+  const showAlert = useCallback(
+    (title, message, config = {}) => {
+      // Usar snackbar en lugar de Alert nativo para mejor UX
+      const fullMessage = title ? `${title}: ${message}` : message;
+      return showNotification(fullMessage, NOTIFICATION_TYPES.INFO, {
+        duration: 5000, // Un poco más de tiempo para leer
+        ...config,
       });
     },
-    [enqueueNotification]
+    [showNotification]
   );
 
-  // Valor del contexto
-  const contextValue = {
+  // Función para alertas nativas críticas (solo cuando sea absolutamente necesario)
+  const showNativeAlert = useCallback(
+    (title, message, buttons = [{ text: "OK" }]) => {
+      Alert.alert(title, message, buttons);
+    },
+    []
+  );
+
+  // Función para confirmar acciones importantes
+  const showConfirmation = useCallback(
+    (title, message, onConfirm, onCancel) => {
+      Alert.alert(
+        title,
+        message,
+        [
+          {
+            text: "Cancelar",
+            style: "cancel",
+            onPress: onCancel,
+          },
+          {
+            text: "Confirmar",
+            style: "default",
+            onPress: onConfirm,
+          },
+        ],
+        { cancelable: false }
+      );
+    },
+    []
+  );
+
+  // Versión mejorada de confirmación con snackbar para casos simples
+  const showConfirmDialog = useCallback(
+    (
+      title,
+      message,
+      onConfirm,
+      onCancel = () => {},
+      confirmText = "Confirmar",
+      cancelText = "Cancelar",
+      critical = false // Si es crítico, usar Alert nativo
+    ) => {
+      if (critical) {
+        // Para acciones críticas (eliminar, cerrar, etc.), usar Alert nativo
+        Alert.alert(
+          title,
+          message,
+          [
+            {
+              text: cancelText,
+              style: "cancel",
+              onPress: onCancel,
+            },
+            {
+              text: confirmText,
+              style: "destructive",
+              onPress: onConfirm,
+            },
+          ],
+          { cancelable: false }
+        );
+      } else {
+        // Para confirmaciones simples, usar snackbar con acciones
+        const id = showNotification(
+          `${title}: ${message}`,
+          NOTIFICATION_TYPES.WARNING,
+          {
+            duration: 8000, // Más tiempo para que el usuario pueda decidir
+            autoHide: false, // No ocultar automáticamente
+            actions: [
+              {
+                text: cancelText,
+                onPress: () => {
+                  hideNotification(id);
+                  onCancel();
+                },
+              },
+              {
+                text: confirmText,
+                onPress: () => {
+                  hideNotification(id);
+                  onConfirm();
+                },
+                style: "primary",
+              },
+            ],
+          }
+        );
+      }
+    },
+    [showNotification, hideNotification]
+  );
+
+  // Función para mostrar alertas de error con opción de reintentar
+  const showErrorWithRetry = useCallback(
+    (message, onRetry, retryText = "Reintentar") => {
+      Alert.alert(
+        "Error",
+        message,
+        [
+          { text: "Cancelar", style: "cancel" },
+          { text: retryText, onPress: onRetry },
+        ],
+        { cancelable: false }
+      );
+    },
+    []
+  );
+
+  const value = {
+    // Estado
+    notifications,
+
+    // Funciones principales
     showNotification,
+    hideNotification,
+    clearAllNotifications,
+
+    // Funciones de conveniencia (snackbars)
     showSuccess,
     showError,
     showWarning,
-    showConfirm,
-    showConfirmDeny, // Nuevo método
-    showPersistent, // Nuevo método
-    hideNotification,
+    showInfo,
+    showAlert, // Ahora usa snackbar por defecto
+
+    // Confirmaciones inteligentes
+    showConfirmDialog, // Usa snackbar o Alert según criticidad
+    showConfirmation, // Mantener para compatibilidad (usa Alert)
+
+    // Alertas nativas (solo para casos críticos)
+    showNativeAlert,
+    showErrorWithRetry,
+
+    // Constantes
+    NOTIFICATION_TYPES,
   };
+
   return (
-    <NotificationContext.Provider value={contextValue}>
+    <NotificationContext.Provider value={value}>
       {children}
-      <NotificationBanner
-        visible={visible}
-        message={message}
-        type={type}
-        action={action}
-        onDismiss={hideNotification}
-        duration={duration}
-        isPersistent={isPersistent}
-        confirmAction={confirmAction}
-        cancelAction={cancelAction}
-      />
     </NotificationContext.Provider>
   );
 };
 
-export default NotificationContext;
-
-// Hook personalizado para usar el contexto de notificaciones
-export const useNotification = () => {
+// Hook personalizado para usar las notificaciones
+export const useNotifications = () => {
   const context = useContext(NotificationContext);
+
   if (!context) {
     throw new Error(
-      "useNotification must be used within a NotificationProvider"
+      "useNotifications debe ser usado dentro de un NotificationProvider"
     );
   }
+
   return context;
 };
+
+// Hook especializado para manejo de errores de API
+export const useApiNotifications = () => {
+  const { showError, showSuccess, showWarning } = useNotifications();
+
+  const handleApiError = useCallback(
+    (error, customMessage = null) => {
+      let message = customMessage || "Ha ocurrido un error inesperado";
+
+      if (error?.response?.data?.message) {
+        message = error.response.data.message;
+      } else if (error?.message) {
+        message = error.message;
+      }
+
+      showError(message);
+    },
+    [showError]
+  );
+
+  const handleApiSuccess = useCallback(
+    (message = "Operación completada exitosamente") => {
+      showSuccess(message);
+    },
+    [showSuccess]
+  );
+
+  const handleApiWarning = useCallback(
+    (message) => {
+      showWarning(message);
+    },
+    [showWarning]
+  );
+
+  return {
+    handleApiError,
+    handleApiSuccess,
+    handleApiWarning,
+  };
+};
+
+export default NotificationContext;

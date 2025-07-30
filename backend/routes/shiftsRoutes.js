@@ -3,6 +3,7 @@ import {
   getAllShifts,
   getShiftById,
   getShiftByDate,
+  getShiftsByMonth,
   saveShift,
   deleteShift,
   saveInterval,
@@ -15,6 +16,9 @@ const router = express.Router();
 
 // Ruta para obtener horarios por fecha
 router.get("/shifts/date/:fecha_inicio_semana", getShiftByDate);
+
+// Ruta optimizada para obtener horarios mensuales (cache)
+router.get("/shifts/month/:year/:month", getShiftsByMonth);
 
 // Ruta especial para exportación mensual de horarios
 router.get("/shifts/export/month/:fecha_inicio_mes", getMonthlyShiftsForExport);

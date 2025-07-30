@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { DocumentPicker } from "@react-native-picker/picker";
-import { Alert } from "react-native";
 import { Services } from "../api/index";
 import { NGROK_HOST } from "@env";
+import useNotifications from "./useNotifications";
 
 const useFileUpload = (config = {}) => {
+  const { showError, showSuccess } = useNotifications();
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -132,7 +133,7 @@ const useFileUpload = (config = {}) => {
       return uploadResults;
     } catch (error) {
       setError(error.message);
-      Alert.alert("Error", error.message);
+      showError("Error", error.message);
       throw error;
     } finally {
       setIsUploading(false);

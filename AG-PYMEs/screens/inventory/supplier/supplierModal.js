@@ -1,16 +1,10 @@
 import React, { useState, useEffect } from "react";
-import {
-  Text,
-  View,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Alert,
-} from "react-native";
+import { Text, View, ScrollView, StyleSheet, Switch } from "react-native";
 import { TextInput, HelperText } from "react-native-paper";
 import { useTheme } from "../../../context/ThemeContext";
 import ModalTemplate from "../../../components/modalTemplate";
 import MailTemplateEditor from "./MailTemplateEditor";
+import useNotifications from "../../../hooks/useNotifications";
 
 // Límites de caracteres según la base de datos
 const FIELD_LIMITS = {
@@ -30,6 +24,7 @@ const FIELD_LIMITS = {
 const SupplierModal = ({ visible, onClose, supplier, onSave }) => {
   const { themeObject } = useTheme();
   const styles = createStyles(themeObject);
+  const { showError, showSuccess } = useNotifications();
 
   const [formData, setFormData] = useState({
     nombre_proveedor: "",
@@ -244,7 +239,7 @@ const SupplierModal = ({ visible, onClose, supplier, onSave }) => {
   // Maneja el envío del formulario
   const handleSubmit = async () => {
     if (!validateForm()) {
-      Alert.alert("Error", "Por favor, corrige los errores en el formulario");
+      showError("Error", "Por favor, corrige los errores en el formulario");
       return;
     }
 
@@ -257,7 +252,7 @@ const SupplierModal = ({ visible, onClose, supplier, onSave }) => {
           : null,
       });
     } catch (error) {
-      Alert.alert("Error", error.message || "No se pudo guardar el proveedor");
+      showError("Error", error.message || "No se pudo guardar el proveedor");
     } finally {
       setIsLoading(false);
     }

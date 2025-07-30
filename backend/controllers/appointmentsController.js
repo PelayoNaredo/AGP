@@ -60,7 +60,10 @@ export const getAppointmentsByDateRange = async (req, res) => {
 
     res.json(result.rows);
   } catch (error) {
-    console.error("Error al obtener citas por rango de fechas:", error);
+    console.error(
+      "[APPOINTMENTS_CONTROLLER] Error al obtener citas por rango de fechas:",
+      error
+    );
     res.status(500).json({ message: "Error interno del servidor" });
   }
 };
@@ -183,10 +186,16 @@ export const createAppointment = async (req, res) => {
     notas,
   } = req.body;
 
-  if (!id_empleado || !fecha_inicio || !fecha_fin) {
+  if ((!id_empleado || id_empleado === "") && id_empleado !== "sin_asignar") {
     return res.status(400).json({
       message:
         "Empleado, fecha de inicio y fecha de fin son campos obligatorios",
+    });
+  }
+
+  if (!fecha_inicio || !fecha_fin) {
+    return res.status(400).json({
+      message: "Fecha de inicio y fecha de fin son campos obligatorios",
     });
   }
 
@@ -195,8 +204,8 @@ export const createAppointment = async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    // Verificar que el empleado existe
-    if (id_empleado) {
+    // Verificar que el empleado existe (solo si no es "sin_asignar")
+    if (id_empleado && id_empleado !== "sin_asignar") {
       const employeeCheck = await client.query(
         "SELECT id_empleado FROM employees WHERE id_empleado = $1",
         [id_empleado]
@@ -231,10 +240,14 @@ export const createAppointment = async (req, res) => {
       }
     }
     // Ya no verificamos solapamientos - permitimos múltiples citas simultáneas
-    // para cualquier profesional// Crear la cita
+    // para cualquier profesional
+
+    // Crear la cita
     // Convertir cadenas vacías a null para campos de ID para evitar error de tipo de datos
     const cleanedClientId = id_cliente === "" ? null : id_cliente;
     const cleanedServiceId = id_servicio === "" ? null : id_servicio;
+    const cleanedEmployeeId =
+      id_empleado === "sin_asignar" || id_empleado === "" ? null : id_empleado;
 
     // Asegurar que las fechas son tratadas correctamente con zona horaria
     const parsedFechaInicio = new Date(fecha_inicio);
@@ -251,7 +264,7 @@ export const createAppointment = async (req, res) => {
     `,
       [
         cleanedClientId,
-        id_empleado,
+        cleanedEmployeeId,
         cleanedServiceId,
         fecha_inicio,
         fecha_fin,
@@ -381,7 +394,7 @@ export const updateAppointment = async (req, res) => {
             : id_cliente
           : appointmentCheck.rows[0].id_cliente,
         id_empleado !== undefined
-          ? id_empleado === ""
+          ? id_empleado === "" || id_empleado === "sin_asignar"
             ? null
             : id_empleado
           : appointmentCheck.rows[0].id_empleado,

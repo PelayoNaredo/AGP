@@ -1,24 +1,73 @@
 import React, { useState, useEffect, useRef } from "react";
-import { StyleSheet, Alert } from "react-native";
+import { StyleSheet } from "react-native";
 import AlertBox from "./alertBox.js";
-import { getAlerts } from "../api";
+import useNotifications from "../hooks/useNotifications";
+
+// Import dinámico defensivo para evitar problemas de timing
+let Services = null;
+try {
+  Services = require("../api").default?.Services || require("../api")?.Services;
+} catch (error) {
+  // Error silencioso, se manejará en el useEffect
+}
 
 // Objeto de alerta estática para usar con métodos
 export const AlertManagerService = {
   showAlert: (type, title, message) => {
-    Alert.alert(title, message);
+    // Usar el sistema de notificaciones moderno en lugar de Alert nativo
+    const { showAlert } = useNotifications();
+    showAlert(title, message);
   },
 };
 
-const AlertManager = ({ alertType, customAlerts = [], onAlertPress }) => {
+const AlertManager = ({
+  alertType,
+  customAlerts = [],
+  onAlertPress,
+  disableApiCalls = false, // Nueva prop para deshabilitar llamadas de API
+}) => {
   const [apiAlerts, setApiAlerts] = useState([]);
   const [currentAlertIndex, setCurrentAlertIndex] = useState(0);
+  const [isServicesReady, setIsServicesReady] = useState(false);
   const alertQueue = useRef([]);
-  const isMounted = useRef(true); // Combinar y validar alertas de API y personalizadas
+  const isMounted = useRef(true);
+
+  // Verificar disponibilidad de Services al montar (solo si necesitamos API)
+  useEffect(() => {
+    if (disableApiCalls) {
+      setIsServicesReady(false);
+      return;
+    }
+
+    const checkServices = () => {
+      // Re-intentar cargar Services si no está disponible
+      if (!Services) {
+        try {
+          Services =
+            require("../api").default?.Services || require("../api")?.Services;
+        } catch (error) {
+          // Error silencioso, reintentará
+        }
+      }
+
+      if (Services && Services.Data && Services.Data.Alerts) {
+        setIsServicesReady(true);
+      } else {
+        // Reintentar en 100ms
+        setTimeout(checkServices, 100);
+      }
+    };
+    checkServices();
+  }, [disableApiCalls]);
+
+  // Combinar y validar alertas de API y personalizadas
   const allAlerts = React.useMemo(() => {
-    // Combinamos alertas de la API y personalizadas
+    // Si se deshabilitan las API calls, solo usar customAlerts
+    const alerts = disableApiCalls ? [] : apiAlerts;
+
+    // Combinamos alertas de la API (si están habilitadas) y personalizadas
     const combinedAlerts = [
-      ...apiAlerts,
+      ...alerts,
       ...(Array.isArray(customAlerts) ? customAlerts : []),
     ];
 
@@ -26,12 +75,25 @@ const AlertManager = ({ alertType, customAlerts = [], onAlertPress }) => {
     return combinedAlerts.filter(
       (alert) => alert && alert.message && alert.estado !== "completado"
     );
-  }, [apiAlerts, customAlerts]);
-  // Obtener alertas desde la API usando el servicio
+  }, [apiAlerts, customAlerts, disableApiCalls]);
+
+  // Obtener alertas desde la API usando el servicio optimizado
   useEffect(() => {
+    // Solo ejecutar si Services está listo Y no están deshabilitadas las API calls
+    if (!isServicesReady || disableApiCalls) return;
+
     const fetchAlerts = async () => {
       try {
-        const data = await getAlerts();
+        // Doble verificación defensiva
+        if (!Services?.Data?.Alerts) {
+          console.error(
+            "[ALERT_MANAGER]   Services.Data.Alerts no está disponible"
+          );
+          return;
+        }
+
+        // Usar servicio optimizado con cache - no forzar refresh
+        const data = await Services.Data.Alerts.getAll(false);
 
         const filteredAlerts = alertType
           ? data.filter(
@@ -65,7 +127,7 @@ const AlertManager = ({ alertType, customAlerts = [], onAlertPress }) => {
     return () => {
       isMounted.current = false;
     };
-  }, [alertType]);
+  }, [alertType, isServicesReady, disableApiCalls]); // Añadir dependencia de disableApiCalls
   // Manejar la cola de alertas
   useEffect(() => {
     if (allAlerts.length === 0) return;
@@ -93,6 +155,14 @@ const AlertManager = ({ alertType, customAlerts = [], onAlertPress }) => {
     console.warn("Alerta sin mensaje o mal formateada:", currentAlert);
     return null;
   }
+
+  // Función para manejar el press de la alerta
+  const handleAlertPress = () => {
+    if (onAlertPress && typeof onAlertPress === "function") {
+      onAlertPress(currentAlert);
+    }
+  };
+
   // Usamos key para forzar la recreación del componente cuando cambie la alerta
   return (
     <AlertBox

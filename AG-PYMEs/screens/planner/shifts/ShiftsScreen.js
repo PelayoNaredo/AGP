@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { DatePickerModal } from "react-native-paper-dates";
 import { useTheme } from "../../../context/ThemeContext";
-import useSettings from "../../../hooks/useSettings";
+import useSettingsWithCache from "../../../hooks/useSettings";
 import ShiftManagerContainer from "./ShiftManagerContainer";
 import ShiftHeader from "./header/shiftHeader";
 import TableHeader from "./table/tableHeader";
@@ -18,7 +18,7 @@ import ShiftModal from "./table/shiftModal";
 // Componente principal de la pantalla de turnos
 const ShiftsScreen = () => {
   const { themeObject } = useTheme();
-  const { settings, isLoading: settingsLoading } = useSettings();
+  const { settings, isLoading: settingsLoading } = useSettingsWithCache();
   const scrollViewRef = useRef(null);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [editingShift, setEditingShift] = useState(null);

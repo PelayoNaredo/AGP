@@ -171,7 +171,7 @@ Monitoreo inteligente que detecta patrones inusuales y problemas potenciales ant
 
 ---
 
-## 📊 Analytics y Business Intelligence con IA
+## Analytics y Business Intelligence con IA
 
 ### 1. Dashboard Predictivo Avanzado
 
@@ -900,7 +900,7 @@ Cálculo automático que combina todos los KPIs para generar un score general de
 
 ---
 
-## 📊 Beneficios Cuantificables
+## Beneficios Cuantificables
 
 ### 1. Impacto Financiero Proyectado
 

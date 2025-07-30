@@ -4,7 +4,6 @@ import {
   Text,
   TextInput,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   Pressable,
 } from "react-native";
@@ -158,9 +157,7 @@ const AddProductModal = ({ visible, onClose, product, onCreateSuccess }) => {
   // Manejar el envío del formulario
   const handleSubmit = async () => {
     if (!validateForm()) {
-      Alert.alert(
-        "Error",
-        "Por favor, complete todos los campos requeridos correctamente"
+      showError("Error", "Por favor, complete todos los campos requeridos correctamente"
       );
       return;
     }

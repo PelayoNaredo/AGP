@@ -7,6 +7,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
   // Verificar sesión al iniciar la app
   useEffect(() => {
     const checkToken = async () => {
@@ -31,6 +32,7 @@ export const AuthProvider = ({ children }) => {
 
     checkToken();
   }, []);
+
   // Iniciar sesión
   const login = async (credentials) => {
     try {
@@ -49,6 +51,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     }
   };
+
   // Cerrar sesión
   const logout = async () => {
     try {

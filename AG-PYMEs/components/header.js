@@ -39,7 +39,8 @@ const CustomHeader = ({ navigation: navProp, route, options, back }) => {
 
   const fetchPendingAlerts = useCallback(async () => {
     try {
-      const alerts = await Services.Data.Alerts.getAll();
+      // Usar servicio optimizado con cache
+      const alerts = await Services.Data.Alerts.getAll(false); // No forzar refresh
       const pendingCount = alerts.filter(
         (alert) => alert.estado === "pendiente"
       ).length;

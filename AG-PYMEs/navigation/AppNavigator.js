@@ -224,9 +224,19 @@ const CustomBottomTabs = () => {
       screenOptions={{
         headerShown: false,
         tabBarHideOnKeyboard: true,
+        // Optimización: Mantener pantallas en memoria
+        lazy: false, // Cargar todas las pestañas inmediatamente
+        unmountOnBlur: false, // No desmontar al cambiar de pestaña
       }}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{
+          // Optimización específica para Home
+          freezeOnBlur: false,
+        }}
+      />
       <Tab.Screen name="Planner" component={PlannerScreen} />
       <Tab.Screen name="Inventory" component={InventoryScreen} />
       <Tab.Screen name="Financial" component={FinancialScreen} />
@@ -247,6 +257,9 @@ const AppStack = () => {
         cardStyle: {
           paddingTop: 0, // Eliminar padding superior de las pantallas
         },
+        // Optimización: Mantener pantallas en memoria
+        detachPreviousScreen: false, // No desmontar pantalla anterior
+        freezeOnBlur: false, // No congelar al salir de foco
       }}
     >
       <Stack.Screen
@@ -281,6 +294,9 @@ const AppStack = () => {
         component={AlertsScreen}
         options={{
           headerShown: false,
+          // Optimización: Mantener pantalla en memoria
+          lazy: false, // Cargar inmediatamente
+          unmountOnBlur: false, // No desmontar al perder foco
         }}
       />
     </Stack.Navigator>

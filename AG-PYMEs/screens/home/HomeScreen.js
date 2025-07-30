@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   ScrollView,
@@ -19,6 +19,7 @@ import { ProfitabilityCard } from "./ProfitabilityCard";
 import { ProductServiceBalanceCard } from "./ProductServiceBalanceCard";
 import AlertManager from "../../components/alertManager";
 import { useTheme } from "../../context/ThemeContext";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Services } from "../../api/index";
 
 const { width } = Dimensions.get("window");
@@ -58,43 +59,116 @@ const HomeScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [dashboardData, setDashboardData] = useState(null);
   const [error, setError] = useState(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  const fetchData = async () => {
+  /**
+   * Fetch optimizado con cache para dashboard
+   * Mantiene la misma interfaz pero usa cache internamente
+   */
+  const fetchData = useCallback(async (forceRefresh = false) => {
     try {
-      const data = await Services.Data.Dashboard.getData();
+      // Verificación defensiva para Services
+      if (!Services || !Services.Data || !Services.Data.Dashboard) {
+        console.error(
+          "[HOME_SCREEN]   Services.Data.Dashboard no está disponible"
+        );
+        setError("Servicio no disponible");
+        setIsLoading(false);
+        return;
+      }
+
+      const startTime = Date.now();
+
+      // Usar servicio optimizado con cache
+      const data = await Services.Data.Dashboard.getData(forceRefresh);
+
+      const duration = Date.now() - startTime;
+
       setDashboardData(data);
       setError(null);
+      setIsInitialLoad(false);
     } catch (err) {
+      console.error("[HOME_SCREEN] Error al cargar dashboard:", err);
       setError("Error al cargar los datos");
-      console.error(err);
+      setIsInitialLoad(false);
     } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchData();
-  };
-
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 5 * 60 * 1000);
-    return () => clearInterval(interval);
   }, []);
+
+  // Solo cargar en focus si es la primera vez o no hay datos
+  useFocusEffect(
+    useCallback(() => {
+      if (isInitialLoad || !dashboardData) {
+        fetchData();
+      }
+    }, [fetchData, isInitialLoad, dashboardData])
+  );
+
+  /**
+   * Refresh optimizado - fuerza actualización desde servidor
+   */
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchData(true); // Force refresh para pull-to-refresh
+  }, [fetchData]);
+
+  // Memoizar las alertas procesadas para evitar recálculos innecesarios
+  const processedAlerts = useMemo(() => {
+    // Debug information para entender la estructura de datos
+    const alertasDebug = {
+      estado: dashboardData?.alertas ? "CON_ALERTAS" : "SIN_ALERTAS",
+      estructura: dashboardData?.alertas || "NO_ALERTAS",
+      proximas: dashboardData?.alertas?.proximas,
+      proximasLength: dashboardData?.alertas?.proximas?.length || 0,
+    };
+
+    // Las alertas están en dashboardData.alertas.proximas (no directamente en alertas)
+    const alertasArray = dashboardData?.alertas?.proximas;
+
+    if (!alertasArray || !Array.isArray(alertasArray)) {
+      return [];
+    }
+
+    const alerts = alertasArray.map((alerta) => ({
+      message:
+        alerta.mensaje ||
+        alerta.description ||
+        alerta.message ||
+        alerta.titulo ||
+        "",
+      type: alerta.tipo || alerta.type || "info",
+      id:
+        alerta.id_recordatorio ||
+        alerta.id ||
+        Math.random().toString(36).substring(7),
+      priority: alerta.prioridad || alerta.priority || "normal",
+      estado: alerta.estado || "pendiente",
+      data: alerta, // Conservamos los datos originales
+    }));
+
+    return alerts;
+  }, [dashboardData?.alertas?.proximas]);
 
   if (isLoading || !dashboardData) {
     return (
-      <ActivityIndicator size="large" color={themeObject.colors.primary} />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={themeObject.colors.primary} />
+        <Text style={[styles.loadingText, { color: themeObject.colors.text }]}>
+          Cargando dashboard...
+        </Text>
+      </View>
     );
   }
 
   if (error) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={{ color: themeObject.colors.error }}>{error}</Text>
-        <CustomButton title="Reintentar" onPress={fetchData} />
+        <Text style={[styles.errorText, { color: themeObject.colors.error }]}>
+          {error}
+        </Text>
+        <CustomButton title="Reintentar" onPress={() => fetchData(true)} />
       </View>
     );
   }
@@ -118,28 +192,18 @@ const HomeScreen = ({ navigation }) => {
         entering={FadeInDown.delay(50).duration(600)}
         style={[styles.screenTitle, { color: themeObject.colors.text }]}
       >
-        Panel de Control
+        Dashboard
       </Animated.Text>
 
       <AnimatedCard delay={100}>
         <View style={styles.alertContainer}>
           <AlertManager
-            customAlerts={
-              dashboardData &&
-              dashboardData.alertas &&
-              Array.isArray(dashboardData.alertas)
-                ? dashboardData.alertas.map((alerta) => ({
-                    message:
-                      alerta.mensaje ||
-                      alerta.description ||
-                      alerta.message ||
-                      "",
-                    type: alerta.tipo || alerta.type || "info",
-                    id: alerta.id || Math.random().toString(36).substring(7),
-                    data: alerta, // Conservamos los datos originales
-                  }))
-                : []
-            }
+            customAlerts={processedAlerts}
+            disableApiCalls={true} // Evitar llamadas duplicadas
+            onAlertPress={(alert) => {
+              // Navegar a alertas al presionar una alerta
+              navigation.navigate("Alerts");
+            }}
           />
         </View>
       </AnimatedCard>
@@ -269,6 +333,18 @@ const styles = {
     maxWidth: width > 768 ? "50%" : "100%",
     minWidth: 0,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 32,
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    textAlign: "center",
+    opacity: 0.8,
+  },
   errorContainer: {
     flex: 1,
     justifyContent: "center",
@@ -284,4 +360,4 @@ const styles = {
   },
 };
 
-export default HomeScreen;
+export default React.memo(HomeScreen);

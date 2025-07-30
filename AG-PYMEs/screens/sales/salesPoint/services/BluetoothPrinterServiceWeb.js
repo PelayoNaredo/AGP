@@ -132,10 +132,7 @@ class BluetoothPrinterServiceWeb {
     Alert.alert(
       "Simulación de impresión",
       "En un entorno web, la impresión Bluetooth no está disponible. Se ha generado un ticket simulado que se muestra en la consola del navegador.",
-      [
-        { text: "Ver detalles", onPress: () => console.log(ticketContent) },
-        { text: "OK" },
-      ]
+      [{ text: "Ver detalles" }, { text: "OK" }]
     );
 
     return true;

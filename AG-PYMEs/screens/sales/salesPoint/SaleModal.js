@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  Alert,
   TextInput,
   ScrollView,
 } from "react-native";
@@ -16,6 +15,7 @@ import ClientInfoComponent from "../client/ClientInfoComponent";
 import taxCalculator, {
   IVA_TYPES,
 } from "../../../utils/financial/taxCalculator";
+import useNotifications from "../../../hooks/useNotifications";
 
 const SaleModal = ({
   visible,
@@ -30,6 +30,7 @@ const SaleModal = ({
   initialData = {},
 }) => {
   const { themeObject } = useTheme();
+  const { showError, showSuccess, showConfirmDialog } = useNotifications();
   const [paymentMethod, setPaymentMethod] = useState("efectivo");
   const [documentType, setDocumentType] = useState("ticket");
   const [notes, setNotes] = useState("");
@@ -307,7 +308,7 @@ const SaleModal = ({
   const handleConfirm = () => {
     // Validar el método de pago
     if (paymentMethod === "tarjeta" && !cardDetails.lastDigits) {
-      Alert.alert(
+      showError(
         "Error",
         "Por favor, ingresa los últimos dígitos de la tarjeta"
       );
@@ -315,7 +316,7 @@ const SaleModal = ({
     }
 
     if (paymentMethod === "transferencia" && !transferDetails.reference) {
-      Alert.alert(
+      showError(
         "Error",
         "Por favor, ingresa la referencia de la transferencia"
       );

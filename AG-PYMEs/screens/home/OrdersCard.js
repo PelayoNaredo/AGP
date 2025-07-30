@@ -9,6 +9,23 @@ export const OrdersCard = ({ data }) => {
   const { themeObject } = useTheme();
   const theme = themeObject.colors;
 
+  // Verificación defensiva para evitar errores si data es undefined
+  if (!data) {
+    return (
+      <View style={[styles.cardContainer, { backgroundColor: theme.surface }]}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="boat" size={24} color={theme.primary} />
+          <Text style={[styles.cardTitle, { color: theme.text }]}>Pedidos</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <Text style={[styles.loadingText, { color: theme.textSecondary }]}>
+            Cargando datos de pedidos...
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   const getStatusColor = (status) => {
     const statusColors = {
       Pendiente: theme.warning,
@@ -250,5 +267,15 @@ const styles = {
     fontSize: 14,
     fontWeight: "600",
     marginLeft: 8,
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 100,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontStyle: "italic",
   },
 };

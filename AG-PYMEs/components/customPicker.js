@@ -44,9 +44,12 @@ const CustomPicker = ({ selectedValue, onValueChange, items, placeholder }) => {
             backgroundColor: themeObject.colors.surface,
           },
         ]}
-        dropdownIconColor={themeObject.colors.text}
-        dropdownIconRippleColor={themeObject.colors.primary}
-        dropdownBackgroundColor={themeObject.colors.surface}
+        // Solo aplicar estas props en React Native, no en web
+        {...(Platform.OS !== "web" && {
+          dropdownIconColor: themeObject.colors.text,
+          dropdownIconRippleColor: themeObject.colors.primary,
+          dropdownBackgroundColor: themeObject.colors.surface,
+        })}
         itemStyle={Platform.OS === "ios" ? styles.pickerItemIOS : undefined}
         mode={Platform.OS === "android" ? "dropdown" : undefined}
       >
@@ -67,7 +70,9 @@ const CustomPicker = ({ selectedValue, onValueChange, items, placeholder }) => {
             label={item.label}
             value={item.value}
             color={themeObject.colors.text}
-            style={Platform.OS === "android" ? styles.pickerItemAndroid : undefined}
+            style={
+              Platform.OS === "android" ? styles.pickerItemAndroid : undefined
+            }
           />
         ))}
       </Picker>
@@ -100,7 +105,6 @@ const styles = StyleSheet.create({
         paddingRight: 0,
         paddingLeft: 0,
         paddingVertical: 0,
-
       },
       ios: {
         borderWidth: 1,
