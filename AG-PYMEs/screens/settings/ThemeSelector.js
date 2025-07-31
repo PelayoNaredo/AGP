@@ -6,7 +6,21 @@ import CustomButton from "../../components/customButton";
 
 // Componente ThemeSelector permite al usuario seleccionar entre temas claro y oscuro.
 const ThemeSelector = ({ onThemeChange }) => {
-  const { theme, themeObject } = useTheme();
+  const { theme, themeObject, toggleTheme } = useTheme();
+
+  const handleThemeChange = async (newTheme) => {
+    try {
+      // Cambiar tema inmediatamente en el contexto
+      await toggleTheme(newTheme);
+
+      // Llamar al callback si existe
+      if (onThemeChange) {
+        onThemeChange(newTheme);
+      }
+    } catch (error) {
+      console.error("[ThemeSelector] Error al cambiar tema:", error);
+    }
+  };
 
   return (
     <Card
@@ -29,7 +43,7 @@ const ThemeSelector = ({ onThemeChange }) => {
       />
       <Card.Content style={styles.buttonContainer}>
         <CustomButton
-          onPress={() => onThemeChange("claro")}
+          onPress={() => handleThemeChange("claro")}
           variant={theme === "claro" ? "primary" : "ghost"}
           style={styles.button}
           ionIconLeft={theme === "claro" ? "sunny" : "sunny-outline"}
@@ -37,7 +51,7 @@ const ThemeSelector = ({ onThemeChange }) => {
           Claro
         </CustomButton>
         <CustomButton
-          onPress={() => onThemeChange("oscuro")}
+          onPress={() => handleThemeChange("oscuro")}
           variant={theme === "oscuro" ? "primary" : "ghost"}
           style={styles.button}
           ionIconLeft={theme === "oscuro" ? "moon" : "moon-outline"}

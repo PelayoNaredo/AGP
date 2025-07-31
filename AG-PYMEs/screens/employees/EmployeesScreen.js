@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View, StyleSheet } from "react-native";
 import Animated, {
-  FadeInRight,
-  FadeOutLeft,
+  useSharedValue,
+  withTiming,
   FadeInUp,
-  Layout,
 } from "react-native-reanimated";
 import HeaderWithTabs from "../../components/HeaderWithTabs";
+import SearchHeaderBar from "../../components/searchHeaderBar";
 import EmployeesBody from "./employee/employeesBody";
 import LeavesBody from "./leave/leavesBody";
 import { useTheme } from "../../context/ThemeContext";
@@ -19,6 +19,19 @@ const EmployeeScreen = () => {
   const [leaves, setLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Estados para SearchHeaderBar
+  const [currentSearchQuery, setCurrentSearchQuery] = useState("");
+
+  // Referencias para los componentes hijos
+  const employeesBodyRef = useRef(null);
+  const leavesBodyRef = useRef(null);
+
+  // Valores compartidos para animaciones
+  const employeesOpacity = useSharedValue(1);
+  const employeesTranslateX = useSharedValue(0);
+  const leavesOpacity = useSharedValue(0);
+  const leavesTranslateX = useSharedValue(300);
 
   const tabs = [
     {
@@ -34,6 +47,31 @@ const EmployeeScreen = () => {
       inactiveIcon: "medical-outline",
     },
   ];
+
+  // Función para manejar el cambio de vista con animaciones
+  const handleViewChange = (newView) => {
+    if (newView === activeView) return;
+
+    const isGoingToEmployees = newView === "employees";
+
+    if (isGoingToEmployees) {
+      // Mostrar empleados, ocultar bajas
+      employeesOpacity.value = withTiming(1, { duration: 300 });
+      employeesTranslateX.value = withTiming(0, { duration: 300 });
+      leavesOpacity.value = withTiming(0, { duration: 300 });
+      leavesTranslateX.value = withTiming(300, { duration: 300 });
+    } else {
+      // Mostrar bajas, ocultar empleados
+      leavesOpacity.value = withTiming(1, { duration: 300 });
+      leavesTranslateX.value = withTiming(0, { duration: 300 });
+      employeesOpacity.value = withTiming(0, { duration: 300 });
+      employeesTranslateX.value = withTiming(-300, { duration: 300 });
+    }
+
+    setActiveView(newView);
+    // Limpiar búsqueda al cambiar de vista
+    setCurrentSearchQuery("");
+  };
   const loadData = async () => {
     try {
       setLoading(true);
@@ -57,36 +95,86 @@ const EmployeeScreen = () => {
   useEffect(() => {
     loadData();
   }, []);
+
   const handleEmployeeUpdate = () => {
     loadData(); // Recargar todos los datos cuando hay cambios
   };
-  const renderContent = () => {
-    const contentProps = {
-      entering: FadeInRight.duration(400).springify(),
-      exiting: FadeOutLeft.duration(300),
-      layout: Layout.springify(),
-      style: styles.contentView,
-    };
 
-    return activeView === "employees" ? (
-      <Animated.View key={activeView} {...contentProps}>
-        <EmployeesBody
-          employees={employees}
-          loading={loading}
-          error={error}
-          onEmployeeUpdate={handleEmployeeUpdate}
-        />
-      </Animated.View>
-    ) : (
-      <Animated.View key={activeView} {...contentProps}>
-        <LeavesBody
-          employees={employees}
-          leaves={leaves}
-          loading={loading}
-          error={error}
-          onLeaveUpdate={handleEmployeeUpdate}
-        />
-      </Animated.View>
+  // Configuración de SearchHeaderBar según la vista activa
+  const getSearchHeaderConfig = () => {
+    if (activeView === "employees") {
+      return {
+        buttonText: "Nuevo Empleado",
+        buttonIconName: "add-circle-outline",
+        buttonVariant: "info",
+        searchPlaceholder: "Buscar (DNI, Nombre, etc.)...",
+        onButtonPress: () => employeesBodyRef.current?.openModal?.(),
+      };
+    } else {
+      return {
+        buttonText: "Nueva Baja",
+        buttonIconName: "add-circle-outline",
+        buttonVariant: "info",
+        searchPlaceholder: "Buscar por nombre de empleado...",
+        onButtonPress: () => leavesBodyRef.current?.openModal?.(),
+      };
+    }
+  };
+
+  const searchConfig = getSearchHeaderConfig();
+  const renderContent = () => {
+    return (
+      <>
+        {/* EmployeesBody - siempre renderizado */}
+        <Animated.View
+          style={[
+            styles.contentView,
+            {
+              opacity: employeesOpacity,
+              transform: [{ translateX: employeesTranslateX }],
+              pointerEvents: activeView === "employees" ? "auto" : "none",
+            },
+          ]}
+        >
+          <EmployeesBody
+            ref={employeesBodyRef}
+            employees={employees}
+            loading={loading}
+            error={error}
+            onEmployeeUpdate={handleEmployeeUpdate}
+            hideSearchBar={true}
+            externalSearchQuery={currentSearchQuery}
+          />
+        </Animated.View>
+
+        {/* LeavesBody - siempre renderizado */}
+        <Animated.View
+          style={[
+            styles.contentView,
+            {
+              opacity: leavesOpacity,
+              transform: [{ translateX: leavesTranslateX }],
+              pointerEvents: activeView === "leaves" ? "auto" : "none",
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+            },
+          ]}
+        >
+          <LeavesBody
+            ref={leavesBodyRef}
+            employees={employees}
+            leaves={leaves}
+            loading={loading}
+            error={error}
+            onLeaveUpdate={handleEmployeeUpdate}
+            hideSearchBar={true}
+            externalSearchQuery={currentSearchQuery}
+          />
+        </Animated.View>
+      </>
     );
   };
 
@@ -98,21 +186,38 @@ const EmployeeScreen = () => {
     contentView: {
       flex: 1,
     },
+    contentContainer: {
+      flex: 1,
+      position: "relative",
+    },
   });
+
   return (
     <Animated.View
       style={styles.container}
       entering={FadeInUp.duration(600).springify()}
     >
-      {/* Header sin animaciones */}
+      {/* Header */}
       <HeaderWithTabs
         title="Empleados"
         tabs={tabs}
         activeView={activeView}
-        onChangeView={setActiveView}
+        onChangeView={handleViewChange}
       />
 
-      {renderContent()}
+      {/* SearchHeaderBar unificado */}
+      <SearchHeaderBar
+        searchQuery={currentSearchQuery}
+        setSearchQuery={setCurrentSearchQuery}
+        onButtonPress={searchConfig.onButtonPress}
+        buttonText={searchConfig.buttonText}
+        buttonIconName={searchConfig.buttonIconName}
+        buttonVariant={searchConfig.buttonVariant}
+        searchPlaceholder={searchConfig.searchPlaceholder}
+      />
+
+      {/* Contenido con componentes persistentes */}
+      <View style={styles.contentContainer}>{renderContent()}</View>
     </Animated.View>
   );
 };

@@ -2,7 +2,7 @@ import pool from "../db.js";
 
 export const getDashboardData = async (req, res) => {
   try {
-    // Obtener datos financieros comparativos
+    // Obtener datos financieros comparativos (MANTENER PARA TARJETAS)
     const financialQuery = `
       WITH periodos AS (
         SELECT 
@@ -54,6 +54,53 @@ export const getDashboardData = async (req, res) => {
         (i.ingresos_anterior - g.gastos_anterior) as balance_anterior,
         (i.ingresos_anual - g.gastos_anual) as balance_anual
       FROM ingresos_por_periodo i, gastos_por_periodo g;
+    `;
+
+    // NUEVA QUERY: Tendencia temporal para el gráfico (últimos 6 meses)
+    const trendQuery = `
+      WITH balance_mensual AS (
+        SELECT 
+          DATE_TRUNC('month', fecha_emision)::date as mes,
+          COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE 0 END), 0) as ingresos_mes,
+          COALESCE(SUM(CASE WHEN tipo = 'gasto' THEN monto ELSE 0 END), 0) as gastos_mes,
+          COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0) as balance_mes
+        FROM (
+          SELECT fecha_ingreso as fecha_emision, ingresos as monto, 'ingreso' as tipo 
+          FROM income
+          WHERE fecha_ingreso >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months'
+          
+          UNION ALL
+          
+          SELECT fecha_gasto as fecha_emision, monto, 'gasto' as tipo 
+          FROM expenses  
+          WHERE fecha_gasto >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months'
+        ) transacciones
+        GROUP BY DATE_TRUNC('month', fecha_emision)::date
+        ORDER BY mes ASC
+      ),
+      meses_completos AS (
+        SELECT 
+          generate_series(
+            DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months',
+            DATE_TRUNC('month', CURRENT_DATE),
+            INTERVAL '1 month'
+          )::date as mes
+      )
+      SELECT 
+        mc.mes,
+        COALESCE(bm.ingresos_mes, 0) as ingresos,
+        COALESCE(bm.gastos_mes, 0) as gastos,
+        COALESCE(bm.balance_mes, 0) as balance,
+        CASE 
+          WHEN mc.mes = DATE_TRUNC('month', CURRENT_DATE) THEN 'Este mes'
+          WHEN mc.mes = DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month' THEN 'Mes pasado'
+          ELSE TO_CHAR(mc.mes, 'Mon YY')
+        END as etiqueta,
+        EXTRACT(YEAR FROM mc.mes) as año,
+        EXTRACT(MONTH FROM mc.mes) as mes_numero
+      FROM meses_completos mc
+      LEFT JOIN balance_mensual bm ON mc.mes = bm.mes
+      ORDER BY mc.mes ASC;
     `;
 
     // Obtener datos de inventario
@@ -473,6 +520,7 @@ export const getDashboardData = async (req, res) => {
       {
         rows: [finanzas],
       },
+      { rows: tendenciaBalance },
       {
         rows: [inventario],
       },
@@ -496,6 +544,7 @@ export const getDashboardData = async (req, res) => {
       },
     ] = await Promise.all([
       pool.query(financialQuery),
+      pool.query(trendQuery),
       pool.query(inventoryQuery),
       pool.query(alertsQuery),
       pool.query(ordersQuery),
@@ -525,6 +574,15 @@ export const getDashboardData = async (req, res) => {
           balance: parseFloat(finanzas.balance_anual),
         },
       },
+      tendenciaBalance: tendenciaBalance.map((mes) => ({
+        mes: mes.mes,
+        ingresos: parseFloat(mes.ingresos),
+        gastos: parseFloat(mes.gastos),
+        balance: parseFloat(mes.balance),
+        etiqueta: mes.etiqueta,
+        año: parseInt(mes.año),
+        mesNumero: parseInt(mes.mes_numero),
+      })),
       inventario: {
         productosTotal: parseInt(inventario.productos_total),
         productosBajoStock: parseInt(inventario.productos_bajo_stock),

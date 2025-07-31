@@ -4,10 +4,15 @@ import { useUnifiedCache } from "../cache/hooks/useUnifiedCache";
 import { Platform, Alert } from "react-native";
 import { Services } from "../api/index";
 import useNotifications from "./useNotifications";
+import { BaseStorage } from "../api/services/storage";
 
 const useSettingsWithCache = () => {
   const { theme, toggleTheme } = useTheme();
-  const { get, invalidate } = useUnifiedCache();
+  // Desactivar auto-refresh para evitar conflictos con persistencia de tema
+  const { get, invalidate } = useUnifiedCache({
+    enableAutoRefresh: false,
+    autoRefreshInterval: 0,
+  });
   const { showError, showSuccess, showSimpleConfirm } = useNotifications();
 
   const [settings, setSettings] = useState({
@@ -39,9 +44,13 @@ const useSettingsWithCache = () => {
       );
 
       if (setting) {
+        // Obtener tema actual del localStorage para preservarlo
+        const currentTheme = await BaseStorage.getItem("appTheme");
+
         const newSettings = {
           ...setting,
-          tema: setting.tema || "claro",
+          // PRESERVAR el tema del localStorage, no usar el de la API
+          tema: currentTheme || setting.tema || "claro",
         };
 
         // Asegurarnos de que todas las propiedades tienen un valor predeterminado
@@ -58,10 +67,8 @@ const useSettingsWithCache = () => {
         setSettings(newSettings);
         setInitialSettings(newSettings);
 
-        // Si el tema de la API es diferente al tema actual, aplicarlo
-        if (newSettings.tema !== theme) {
-          toggleTheme();
-        }
+        // REMOVIDO: No sincronizar tema automáticamente para evitar conflictos
+        // El tema se maneja independientemente desde el ThemeSelector
       }
     } catch (error) {
       console.error(" [SETTINGS] Error loading settings:", error);
@@ -95,44 +102,15 @@ const useSettingsWithCache = () => {
     };
     setSettings(newSettings);
 
-    // Si el cambio es de tema, actualizarlo inmediatamente
-    if (name === "tema" && value !== theme) {
-      try {
-        await toggleTheme(value);
+    // Si el cambio es de tema, NO hacer nada especial aquí
+    // El ThemeSelector ya maneja el cambio inmediato
+    if (name === "tema") {
+      // Invalidar cache de settings para evitar conflictos con auto-refresh
+      invalidate("settings_1");
 
-        // Guardar en localStorage como respaldo
-        if (Platform.OS === "web") {
-          localStorage.setItem("appTheme", value);
-        }
-        await Services.Storage.Base.setItem("appTheme", value);
-
-        // Actualizar en API en segundo plano
-        const settingsToSave = {
-          ...newSettings,
-          nombre_local: newSettings.nombre_local || "Negocio",
-          direccion: newSettings.direccion || "Dirección",
-          telefono: newSettings.telefono || "Teléfono",
-          url_backend: newSettings.url_backend || "",
-          horario_apertura: newSettings.horario_apertura || "08:00:00",
-          horario_cierre: newSettings.horario_cierre || "18:00:00",
-          logo_local: newSettings.logo_local || "",
-        };
-
-        Services.Data.Settings.update(1, settingsToSave)
-          .then(() => {
-            // Invalidar cache después de guardar
-            invalidate("settings_1");
-          })
-          .catch((err) => {
-            console.error(" [SETTINGS] Error updating theme in API:", err);
-          });
-      } catch (error) {
-        console.error(" [SETTINGS] Error applying theme:", error);
-        showError(
-          "Error de tema",
-          "No se pudo actualizar el tema. Por favor, inténtalo de nuevo."
-        );
-      }
+      // NO guardar en storage, solo actualizar el estado local
+      // El ThemeContext ya se encarga de la persistencia
+      return; // Salir temprano para evitar efectos secundarios
     }
   };
 
@@ -180,7 +158,8 @@ const useSettingsWithCache = () => {
         horario_apertura: settings.horario_apertura || "08:00:00",
         horario_cierre: settings.horario_cierre || "18:00:00",
         logo_local: settings.logo_local || "",
-        tema: settings.tema || "claro",
+        // NO incluir tema aquí - se maneja por separado
+        // tema: settings.tema || "claro",
       };
 
       // Verificar si es una actualización o creación
@@ -198,15 +177,16 @@ const useSettingsWithCache = () => {
       setInitialSettings(settingsToSave);
       setHasChanges(false);
 
-      // Asegurar sincronización de tema
+      // Asegurar sincronización de tema - SOLO si es diferente
       if (settingsToSave.tema && settingsToSave.tema !== theme) {
+        console.log(
+          "[useSettings] saveSettings - Sincronizando tema con contexto:",
+          settingsToSave.tema
+        );
         await toggleTheme(settingsToSave.tema);
       }
 
-      // Guardar en localStorage como respaldo
-      if (Platform.OS === "web" && settingsToSave.tema) {
-        localStorage.setItem("appTheme", settingsToSave.tema);
-      }
+      // NO guardar tema en localStorage desde aquí - lo maneja ThemeContext
 
       showSuccess("Configuración guardada correctamente");
       return true;

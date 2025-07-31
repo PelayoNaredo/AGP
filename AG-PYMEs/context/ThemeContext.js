@@ -120,6 +120,7 @@ export const ThemeProvider = ({ children }) => {
       // Para web: guardar directamente en localStorage primero para asegurar persistencia entre recargas
       if (Platform.OS === "web") {
         localStorage.setItem("appTheme", validThemeName);
+
         // Actualizar la clase y el color de fondo del body en tiempo real
         document.body.className = validThemeName;
         document.body.style.backgroundColor = newTheme.colors.background;
@@ -134,8 +135,26 @@ export const ThemeProvider = ({ children }) => {
 
       // Guardar en caché local (para consistencia en móvil)
       await Services.Storage.Base.setItem("appTheme", validThemeName);
+
+      // Actualizar tema en la API también
+      if (updateApi) {
+        try {
+          // Primero obtener los settings actuales para no sobrescribir otros campos
+          const currentSettings = await Services.Data.Settings.getById(1);
+
+          // Actualizar solo el tema, manteniendo los demás campos
+          const updatedSettings = {
+            ...currentSettings,
+            tema: validThemeName,
+          };
+
+          await Services.Data.Settings.update(1, updatedSettings);
+        } catch (apiError) {
+          // No propagamos el error para no interrumpir la UI
+          // El tema se persiste correctamente en localStorage independientemente de la API
+        }
+      }
     } catch (error) {
-      console.error("Error guardando tema:", error);
       // No propagamos el error para no interrumpir la UI
     }
 
@@ -157,7 +176,7 @@ export const ThemeProvider = ({ children }) => {
 
       await applyTheme(nextTheme, true);
     } catch (error) {
-      console.error("Error changing theme:", error);
+      console.error("[ThemeContext] Error changing theme:", error);
     } finally {
       setIsLoading(false);
     }
@@ -201,57 +220,52 @@ export const ThemeProvider = ({ children }) => {
         // Para la web: primero intentar obtener del localStorage (más rápido)
         if (Platform.OS === "web") {
           const storedTheme = localStorage.getItem("appTheme");
-          if (storedTheme) {
-            selectedTheme = storedTheme === "oscuro" ? "oscuro" : "claro";
-            // Aplicar inmediatamente para evitar parpadeos
-            document.body.className = selectedTheme;
-            document.body.style.backgroundColor =
-              selectedTheme === "oscuro"
-                ? darkTheme.colors.background
-                : lightTheme.colors.background;
+          if (
+            storedTheme &&
+            (storedTheme === "oscuro" || storedTheme === "claro")
+          ) {
+            selectedTheme = storedTheme;
           }
         }
 
-        // Intentar desde AsyncStorage (para móvil o como respaldo)
-        try {
-          const cachedTheme = await Services.Storage.Base.getItem("appTheme");
-          if (cachedTheme) {
-            selectedTheme = cachedTheme === "oscuro" ? "oscuro" : "claro";
+        // Si no se encontró en localStorage, intentar desde AsyncStorage
+        if (selectedTheme === "claro") {
+          try {
+            const cachedTheme = await Services.Storage.Base.getItem("appTheme");
+            if (
+              cachedTheme &&
+              (cachedTheme === "oscuro" || cachedTheme === "claro")
+            ) {
+              selectedTheme = cachedTheme;
+            }
+          } catch (e) {
+            console.error("Error al cargar tema desde AsyncStorage:", e);
           }
-        } catch (e) {
-          console.error("Error al cargar tema desde AsyncStorage:", e);
         }
 
-        // Verificar con la API (si es necesario)
-        try {
-          const settings = await Services.Data.Settings.getById(1);
-          if (settings?.tema) {
-            selectedTheme = settings.tema === "oscuro" ? "oscuro" : "claro";
-          }
-        } catch (e) {
-          console.warn("No se pudo cargar el tema desde la API:", e);
-          // Continuamos con el tema que ya tenemos
-        }
-
-        // Aplicar el tema final
+        // Aplicar el tema final sin validación con la API (para evitar delays)
         const themeToApply =
           selectedTheme === "oscuro" ? darkTheme : lightTheme;
         setTheme(selectedTheme);
         setThemeObject(themeToApply);
 
-        // Guardar en localStorage para futuras sesiones (web)
-        if (Platform.OS === "web") {
-          localStorage.setItem("appTheme", selectedTheme);
-        }
-
-        // También guardar en AsyncStorage
-        await Services.Storage.Base.setItem("appTheme", selectedTheme);
-
-        // Aplicar estilos para web
+        // Aplicar estilos para web inmediatamente
         if (Platform.OS === "web") {
           document.body.className = selectedTheme;
           document.body.style.backgroundColor = themeToApply.colors.background;
+          document.body.style.color =
+            selectedTheme === "oscuro" ? "#F8FAFC" : "#0F172A";
+          document.documentElement.style.setProperty(
+            "--current-theme",
+            selectedTheme
+          );
         }
+
+        // Guardar en ambos storages para asegurar persistencia
+        if (Platform.OS === "web") {
+          localStorage.setItem("appTheme", selectedTheme);
+        }
+        await Services.Storage.Base.setItem("appTheme", selectedTheme);
       } catch (error) {
         console.error("Error al inicializar el tema:", error);
         // En caso de error, asegurarse de que al menos tengamos un tema válido
@@ -287,17 +301,9 @@ export const useTheme = () => {
     throw new Error("useTheme debe ser usado dentro de un ThemeProvider");
   }
 
-  // En la web, siempre sincronizar con localStorage cuando se usa el hook
-  if (Platform.OS === "web" && context.theme) {
-    // Utilizar un efecto lateral para sincronizar
-    // Esto garantiza que el tema esté siempre actualizado incluso si se recarga la página
-    if (typeof localStorage !== "undefined") {
-      const currentTheme = localStorage.getItem("appTheme");
-      if (currentTheme !== context.theme) {
-        localStorage.setItem("appTheme", context.theme);
-      }
-    }
-  }
+  // REMOVIDO: Lógica de sincronización problemática que sobrescribía localStorage
+  // Esta lógica causaba que el tema se resetee al recargar la página
+  // La sincronización ya se maneja correctamente en initializeTheme y applyTheme
 
   return context;
 };

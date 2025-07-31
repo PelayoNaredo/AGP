@@ -4,6 +4,7 @@ import { TextInput, HelperText } from "react-native-paper";
 import { useTheme } from "../../../context/ThemeContext";
 import ModalTemplate from "../../../components/modalTemplate";
 import MailTemplateEditor from "./MailTemplateEditor";
+import CustomPicker from "../../../components/customPicker";
 import useNotifications from "../../../hooks/useNotifications";
 
 // Límites de caracteres según la base de datos
@@ -19,6 +20,20 @@ const FIELD_LIMITS = {
   moneda: 3,
   sitio_web: 100,
 };
+
+// Opciones de moneda disponibles con símbolos
+const CURRENCY_OPTIONS = [
+  { label: "€ Euro (EUR)", value: "EUR" },
+  { label: "$ Dólar Americano (USD)", value: "USD" },
+  { label: "£ Libra Esterlina (GBP)", value: "GBP" },
+  { label: "₣ Franco Suizo (CHF)", value: "CHF" },
+  { label: "¥ Yen Japonés (JPY)", value: "JPY" },
+  { label: "C$ Dólar Canadiense (CAD)", value: "CAD" },
+  { label: "A$ Dólar Australiano (AUD)", value: "AUD" },
+  { label: "kr Corona Sueca (SEK)", value: "SEK" },
+  { label: "kr Corona Noruega (NOK)", value: "NOK" },
+  { label: "kr Corona Danesa (DKK)", value: "DKK" },
+];
 
 //Modal para crear o editar proveedores
 const SupplierModal = ({ visible, onClose, supplier, onSave }) => {
@@ -144,8 +159,12 @@ const SupplierModal = ({ visible, onClose, supplier, onSave }) => {
         break;
 
       case "moneda":
-        if (value.length > FIELD_LIMITS.moneda) {
-          newErrors.moneda = `Máximo ${FIELD_LIMITS.moneda} caracteres`;
+        // Ya no necesitamos validar longitud porque el picker garantiza valores válidos
+        if (
+          value &&
+          !CURRENCY_OPTIONS.find((option) => option.value === value)
+        ) {
+          newErrors.moneda = "Moneda no válida";
         } else {
           delete newErrors.moneda;
         }
@@ -181,7 +200,6 @@ const SupplierModal = ({ visible, onClose, supplier, onSave }) => {
 
     // Formateos específicos
     if (name === "cif") value = value.toUpperCase();
-    if (name === "moneda") value = value.toUpperCase();
     if (name === "dias_credito") value = value.replace(/[^0-9]/g, "");
 
     setFormData({ ...formData, [name]: value });
@@ -426,14 +444,12 @@ const SupplierModal = ({ visible, onClose, supplier, onSave }) => {
             </View>
 
             <View style={styles.halfWidth}>
-              <TextInput
+              <CustomPicker
                 label="Moneda"
-                value={formData.moneda}
-                onChangeText={(text) => handleChange("moneda", text)}
-                maxLength={FIELD_LIMITS.moneda}
-                style={styles.input}
-                mode="outlined"
-                autoCapitalize="characters"
+                selectedValue={formData.moneda}
+                onValueChange={(value) => handleChange("moneda", value)}
+                options={CURRENCY_OPTIONS}
+                placeholder="Seleccionar moneda"
                 error={!!errors.moneda}
               />
               {errors.moneda && (

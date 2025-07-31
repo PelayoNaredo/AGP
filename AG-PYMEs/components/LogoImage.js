@@ -11,7 +11,7 @@ const LogoImage = ({
   size = 40,
   onError,
   onLoad,
-  fallbackIcon = "store-outline",
+  fallbackIcon = "account-circle-outline",
   resizeMode = "contain",
   style = {},
   containerStyle = {},

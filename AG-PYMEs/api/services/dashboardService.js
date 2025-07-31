@@ -14,8 +14,6 @@ let pendingDashboardRequest = null;
 
 class DashboardService {
   constructor() {
-    this.cacheKey = "dashboard_data";
-    this.cacheTTL = 5 * 60 * 1000; // 5 minutos - datos dinámicos del dashboard
     this.adapter = null;
   }
 
@@ -101,41 +99,6 @@ class DashboardService {
       console.warn("[DASHBOARD_SERVICE] Cache no disponible para invalidación");
     }
   }
-
-  /**
-   * Obtener estadísticas de cache
-   */
-  async getCacheStats() {
-    const adapter = this.initializeCache();
-
-    if (adapter) {
-      return adapter.getServiceMetrics();
-    } else {
-      console.warn("[DASHBOARD_SERVICE] Cache no disponible para estadísticas");
-      return null;
-    }
-  }
-
-  /**
-   * Obtener datos solo desde cache (sin fallback a servidor)
-   * Útil para verificar si hay datos en cache
-   */
-  async getCachedDataOnly() {
-    const adapter = this.initializeCache();
-
-    if (adapter && adapter.cacheManager) {
-      try {
-        return await adapter.cacheManager.get("dashboard:getData:dashboard");
-      } catch (error) {
-        console.warn(
-          "[DASHBOARD_SERVICE] Error obteniendo datos cached:",
-          error
-        );
-        return null;
-      }
-    }
-    return null;
-  }
 }
 
 // Instancia singleton
@@ -147,11 +110,6 @@ export const getDashboardData = (forceRefresh = false) =>
 
 export const invalidateDashboardCache = () =>
   dashboardService.invalidateCache();
-
-export const getDashboardCacheStats = () => dashboardService.getCacheStats();
-
-export const getCachedDashboardData = () =>
-  dashboardService.getCachedDataOnly();
 
 // Exportar servicio completo
 export default dashboardService;

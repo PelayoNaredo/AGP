@@ -3,8 +3,19 @@ import { View, Text, StyleSheet, Platform } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { useTheme } from "../context/ThemeContext";
 
-const CustomPicker = ({ selectedValue, onValueChange, items, placeholder }) => {
+const CustomPicker = ({
+  selectedValue,
+  onValueChange,
+  items,
+  options,
+  placeholder,
+  label,
+  error,
+}) => {
   const { themeObject } = useTheme();
+
+  // Usar 'options' si está disponible, sino usar 'items'
+  const pickerItems = options || items || [];
 
   return (
     <View
@@ -64,7 +75,7 @@ const CustomPicker = ({ selectedValue, onValueChange, items, placeholder }) => {
           backgroundColor={themeObject.colors.card}
           enabled={Platform.OS !== "ios"}
         />
-        {items.map((item) => (
+        {pickerItems.map((item) => (
           <Picker.Item
             key={item.value}
             label={item.label}

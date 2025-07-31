@@ -12,8 +12,6 @@ import {
   createAlert,
   updateAlert,
   deleteAlert,
-  invalidateAlertsCache,
-  preloadAlerts,
 } from "./services/alertsService";
 import {
   getAllAppointments,
@@ -37,7 +35,6 @@ import {
 import {
   getDashboardData,
   invalidateDashboardCache,
-  getDashboardCacheStats,
 } from "./services/dashboardService";
 import {
   getAllEmployees,
@@ -158,9 +155,6 @@ const Services = {
       create: createAlert,
       update: updateAlert,
       delete: deleteAlert,
-      // Nuevas funciones optimizadas
-      invalidateCache: invalidateAlertsCache,
-      preload: preloadAlerts,
     }, //Servicio de citas
     Appointments: {
       getAll: getAllAppointments,
@@ -186,7 +180,6 @@ const Services = {
     Dashboard: {
       getData: getDashboardData,
       invalidateCache: invalidateDashboardCache,
-      getCacheStats: getDashboardCacheStats,
     },
     //Servicio de empleados
     Employees: {

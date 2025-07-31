@@ -1,4 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, {
+  useState,
+  useEffect,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import {
   View,
   FlatList,
@@ -15,7 +20,7 @@ import OrderCard from "./OrderCard";
 import useNotifications from "../../../hooks/useNotifications";
 
 // Componente OrdersBody para manejar la lógica de pedidos
-const OrdersBody = () => {
+const OrdersBody = forwardRef(({ searchQuery = "" }, ref) => {
   const { themeObject } = useTheme();
   const styles = createStyles(themeObject);
   const { showError, showConfirmDialog, showSuccess } = useNotifications();
@@ -27,6 +32,12 @@ const OrdersBody = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [suppliers, setSuppliers] = useState([]);
+
+  // Exponer métodos para el componente padre
+  useImperativeHandle(ref, () => ({
+    openAddModal: () => setIsModalVisible(true),
+    refreshData: loadOrders,
+  }));
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -219,20 +230,29 @@ const OrdersBody = () => {
 
   return (
     <View style={styles.container}>
-      <CustomButton
-        onPress={() => setIsModalVisible(true)}
-        variant="info"
-        ionIconLeft="add-circle-outline"
-        style={styles.addButton}
-      >
-        Nuevo Pedido
-      </CustomButton>
-
       <FlatList
-        data={orders}
+        data={orders.filter((order) => {
+          const searchLower = searchQuery.toLowerCase();
+          return (
+            order.id_pedido.toString().includes(searchLower) ||
+            order.estado.toLowerCase().includes(searchLower) ||
+            getSupplierName(order.id_proveedor)
+              .toLowerCase()
+              .includes(searchLower) ||
+            (order.fecha_pedido &&
+              order.fecha_pedido.toLowerCase().includes(searchLower))
+          );
+        })}
         keyExtractor={(item) => item.id_pedido.toString()}
         renderItem={renderOrderItem}
         contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <Text style={[styles.emptyText, { color: themeObject.colors.text }]}>
+            {searchQuery
+              ? "No se encontraron pedidos"
+              : "No hay pedidos registrados"}
+          </Text>
+        }
       />
 
       <OrderModal
@@ -266,7 +286,7 @@ const OrdersBody = () => {
       />
     </View>
   );
-};
+});
 
 // Los estilos de estado ahora se manejan en el componente OrderCard
 
@@ -277,11 +297,14 @@ const createStyles = (theme) =>
       padding: 16,
       backgroundColor: theme.colors.background,
     },
-    addButton: {
-      marginBottom: 16,
-    },
     listContent: {
       paddingBottom: 32,
+    },
+    emptyText: {
+      textAlign: "center",
+      marginTop: 50,
+      fontSize: 16,
+      opacity: 0.7,
     },
   });
 

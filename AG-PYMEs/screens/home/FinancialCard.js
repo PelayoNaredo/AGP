@@ -22,22 +22,26 @@ const ComparisonIndicator = ({ value, color }) => {
 };
 
 // FinancialCard muestra un resumen financiero con ingresos, gastos y balance
-export const FinancialCard = ({ data, theme, navigation }) => {
+export const FinancialCard = ({
+  data,
+  tendenciaBalance,
+  theme,
+  navigation,
+}) => {
   const calculatePercentChange = (actual, comparacion) => {
     if (comparacion === 0) return actual > 0 ? 100 : 0;
     return ((actual - comparacion) / Math.abs(comparacion)) * 100;
   };
 
-  const chartData = [
-    // Ingresos
+  // Usar datos de tendencia si están disponibles, sino usar formato anterior
+  const chartData = tendenciaBalance || [
+    // Fallback al formato anterior
     { x: "Ingresos", y: data.actual.ingresos, periodo: "actual" },
     { x: "Ingresos", y: data.anterior.ingresos, periodo: "anterior" },
     { x: "Ingresos", y: data.anual.ingresos, periodo: "anual" },
-    // Gastos
     { x: "Gastos", y: -data.actual.gastos, periodo: "actual" },
     { x: "Gastos", y: -data.anterior.gastos, periodo: "anterior" },
     { x: "Gastos", y: -data.anual.gastos, periodo: "anual" },
-    //Balance
     { x: "Balance", y: data.actual.balance, periodo: "actual" },
     { x: "Balance", y: data.anterior.balance, periodo: "anterior" },
     { x: "Balance", y: data.anual.balance, periodo: "anual" },

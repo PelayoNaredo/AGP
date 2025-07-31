@@ -1,7 +1,6 @@
 import { httpFetch } from "../http";
 import { alertsEndpoint } from "../endpoints";
 import { createServiceAdapter } from "../../cache/adapters/ServiceAdapter.js";
-import { useUnifiedCache } from "../../cache/hooks/useUnifiedCache.js";
 
 /**
  * Alerts Service con Sistema de Cache Unificado
@@ -170,47 +169,13 @@ const updateCacheAfterMutation = async () => {
     const adapter = initializeCache();
 
     if (adapter) {
-      // Opción 1: Invalidar caché (más seguro, refetch en próxima consulta)
+      // Invalidar caché para forzar refresh en próxima consulta
       await adapter.invalidateService(["getAlerts"]);
-
-      // Opción 2: Pre-cargar datos frescos inmediatamente (opcional)
-      // await adapter.withCache('getAlerts', 'all', fetchAlertsFromServer, { skipCache: true });
     } else {
       console.warn("[ALERTS_SERVICE] Cache no disponible para invalidación");
     }
   } catch (error) {
-    console.error("[ALERTS_SERVICE]    Error actualizando caché:", error);
+    console.error("[ALERTS_SERVICE] Error actualizando caché:", error);
     // No re-lanzar error, es operación secundaria
-  }
-};
-
-/**
- * Invalida manualmente el caché de alertas
- * Útil para refresh manual o cuando se detectan datos desactualizados
- */
-export const invalidateAlertsCache = async () => {
-  try {
-    const adapter = initializeCache();
-
-    if (adapter) {
-      await adapter.invalidateService();
-    } else {
-      console.warn("[ALERTS_SERVICE] Cache no disponible para invalidación");
-    }
-  } catch (error) {
-    console.error("[ALERTS_SERVICE]  Error limpiando caché:", error);
-  }
-};
-
-/**
- * Pre-carga alertas en background
- * Útil para mejorar UX precargando datos
- */
-export const preloadAlerts = async () => {
-  try {
-    await getAlerts(false); // Usar caché si está disponible
-  } catch (error) {
-    console.error("[ALERTS_SERVICE]    Error pre-cargando alertas:", error);
-    // Error silencioso, no afecta funcionalidad principal
   }
 };

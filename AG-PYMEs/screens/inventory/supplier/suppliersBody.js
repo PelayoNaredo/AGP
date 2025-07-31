@@ -1,5 +1,16 @@
-import React, { useState, useEffect } from "react";
-import { View, FlatList, StyleSheet, ActivityIndicator } from "react-native";
+import React, {
+  useState,
+  useEffect,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
+import {
+  View,
+  FlatList,
+  StyleSheet,
+  ActivityIndicator,
+  Text,
+} from "react-native";
 import { useTheme } from "../../../context/ThemeContext";
 import CustomButton from "../../../components/customButton";
 import { Services } from "../../../api/index";
@@ -8,7 +19,7 @@ import SupplierCard from "./supplierCard";
 import useNotifications from "../../../hooks/useNotifications";
 
 // Componente SuppliersBody para gestionar y visualizar proveedores
-const SuppliersBody = () => {
+const SuppliersBody = forwardRef(({ searchQuery = "" }, ref) => {
   const { themeObject } = useTheme();
   const styles = createStyles(themeObject);
   const { showError, showConfirmDialog, showSuccess } = useNotifications();
@@ -17,6 +28,12 @@ const SuppliersBody = () => {
   const [selectedSupplier, setSelectedSupplier] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Exponer métodos para el componente padre
+  useImperativeHandle(ref, () => ({
+    openAddModal: () => setIsModalVisible(true),
+    refreshData: loadSuppliers,
+  }));
   const loadSuppliers = async () => {
     try {
       const data = await Services.Data.Suppliers.getAll();
@@ -97,20 +114,28 @@ const SuppliersBody = () => {
 
   return (
     <View style={styles.container}>
-      <CustomButton
-        onPress={() => setIsModalVisible(true)}
-        variant="info"
-        ionIconLeft="add-circle-outline"
-        style={styles.addButton}
-      >
-        Nuevo Proveedor
-      </CustomButton>
-
       <FlatList
-        data={suppliers}
+        data={suppliers.filter((supplier) => {
+          const searchLower = searchQuery.toLowerCase();
+          return (
+            supplier.nombre_proveedor.toLowerCase().includes(searchLower) ||
+            (supplier.email &&
+              supplier.email.toLowerCase().includes(searchLower)) ||
+            (supplier.telefono && supplier.telefono.includes(searchQuery)) ||
+            (supplier.direccion_fiscal &&
+              supplier.direccion_fiscal.toLowerCase().includes(searchLower))
+          );
+        })}
         keyExtractor={(item) => item.id_proveedor.toString()}
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <Text style={[styles.emptyText, { color: themeObject.colors.text }]}>
+            {searchQuery
+              ? "No se encontraron proveedores"
+              : "No hay proveedores registrados"}
+          </Text>
+        }
       />
 
       <SupplierModal
@@ -124,7 +149,7 @@ const SuppliersBody = () => {
       />
     </View>
   );
-};
+});
 
 const createStyles = (theme) =>
   StyleSheet.create({
@@ -133,11 +158,14 @@ const createStyles = (theme) =>
       padding: 16,
       backgroundColor: theme.colors.background,
     },
-    addButton: {
-      marginBottom: 16,
-    },
     listContent: {
       paddingBottom: 32,
+    },
+    emptyText: {
+      textAlign: "center",
+      marginTop: 50,
+      fontSize: 16,
+      opacity: 0.7,
     },
   });
 

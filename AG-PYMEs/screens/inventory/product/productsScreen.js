@@ -1,4 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, {
+  useState,
+  useEffect,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import {
   View,
   FlatList,
@@ -15,134 +20,151 @@ import ProductCard from "./ProductCard";
 import useNotifications from "../../../hooks/useNotifications";
 
 // Pagina de Productos, donde se gestionan los productos del inventario
-const ProductsScreen = () => {
-  const { themeObject } = useTheme();
-  const styles = createStyles(themeObject);
-  const { showError, showConfirmDialog, showSuccess } = useNotifications();
+const ProductsScreen = forwardRef(
+  ({ hideSearchBar = false, externalSearchQuery = "" }, ref) => {
+    const { themeObject } = useTheme();
+    const styles = createStyles(themeObject);
+    const { showError, showConfirmDialog, showSuccess } = useNotifications();
 
-  const [products, setProducts] = useState([]);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [suppliersMap, setSuppliersMap] = useState({});
-  const [refreshKey, setRefreshKey] = useState(0);
+    const [products, setProducts] = useState([]);
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [isModalVisible, setIsModalVisible] = useState(false);
+    const [suppliersMap, setSuppliersMap] = useState({});
+    const [refreshKey, setRefreshKey] = useState(0);
 
-  // Cargar productos y proveedores
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [inventoryData, suppliersData] = await Promise.all([
-          Services.Data.Inventory.getAll(),
-          Services.Data.Suppliers.getAll(),
-        ]);
+    // Usar búsqueda externa si se proporciona
+    const currentSearchQuery = externalSearchQuery || searchQuery;
 
-        setProducts(inventoryData);
+    // Exponer métodos para el componente padre
+    useImperativeHandle(ref, () => ({
+      openAddModal: () => setIsModalVisible(true),
+      refreshData: () => setRefreshKey((prev) => prev + 1),
+    }));
 
-        const suppliersMapping = suppliersData.reduce((acc, supplier) => {
-          acc[supplier.id_proveedor] = supplier.nombre_proveedor;
-          return acc;
-        }, {});
-        setSuppliersMap(suppliersMapping);
-      } catch (err) {
-        setError(err.message);
-        showError("Error", "Error cargando datos de productos");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadData();
-  }, [refreshKey]);
-  //Manejo de eliminación de productos
-  const handleDelete = async (id) => {
-    showConfirmDialog(
-      "Confirmar eliminación",
-      "¿Estás seguro de eliminar este producto?",
-      async () => {
+    // Cargar productos y proveedores
+    useEffect(() => {
+      const loadData = async () => {
         try {
-          await Services.Data.Inventory.delete(id);
-          setProducts((prev) => prev.filter((p) => p.id_producto !== id));
-          showSuccess("Producto eliminado correctamente");
-        } catch (error) {
-          showError("Error", "No se pudo eliminar el producto");
-        }
-      },
-      () => {}, // Función onCancel vacía
-      "Eliminar",
-      "Cancelar"
-    );
-  };
-  // Manejo de éxito al crear o editar un producto
-  const handleSuccess = (isEdit = false) => {
-    setRefreshKey((prev) => prev + 1);
-    setIsModalVisible(false);
-    setSelectedProduct(null);
-    showSuccess(
-      isEdit
-        ? "Producto actualizado correctamente"
-        : "Producto creado correctamente"
-    );
-  }; // Componente para renderizar cada producto
-  const renderProductItem = ({ item }) => (
-    <ProductCard
-      product={item}
-      onEdit={setSelectedProduct}
-      onDelete={handleDelete}
-      suppliersMap={suppliersMap}
-    />
-  );
-  return (
-    <View style={{ flex: 1 }}>
-      <SearchHeaderBar
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        onButtonPress={() => setIsModalVisible(true)}
-        buttonText="Nuevo Producto"
-        buttonVariant="info"
-        buttonIconName="add-circle-outline"
-        searchPlaceholder="Buscar productos..."
-        containerStyle={styles.topBar}
-      />
-      <View style={styles.container}>
-        {/* Barra superior */}
+          const [inventoryData, suppliersData] = await Promise.all([
+            Services.Data.Inventory.getAll(),
+            Services.Data.Suppliers.getAll(),
+          ]);
 
-        {/* Listado */}
-        {isLoading ? (
-          <ActivityIndicator size="large" color={themeObject.colors.accent} />
-        ) : (
-          <FlatList
-            showsVerticalScrollIndicator={false}
-            data={products.filter(
-              (p) =>
-                p.nombre_producto
-                  .toLowerCase()
-                  .includes(searchQuery.toLowerCase()) ||
-                p.descripcion.toLowerCase().includes(searchQuery.toLowerCase())
-            )}
-            keyExtractor={(item) => item.id_producto.toString()}
-            renderItem={renderProductItem}
-            ListEmptyComponent={
-              <Text style={styles.emptyText}>No hay productos registrados</Text>
-            }
+          setProducts(inventoryData);
+
+          const suppliersMapping = suppliersData.reduce((acc, supplier) => {
+            acc[supplier.id_proveedor] = supplier.nombre_proveedor;
+            return acc;
+          }, {});
+          setSuppliersMap(suppliersMapping);
+        } catch (err) {
+          setError(err.message);
+          showError("Error", "Error cargando datos de productos");
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      loadData();
+    }, [refreshKey]);
+    //Manejo de eliminación de productos
+    const handleDelete = async (id) => {
+      showConfirmDialog(
+        "Confirmar eliminación",
+        "¿Estás seguro de eliminar este producto?",
+        async () => {
+          try {
+            await Services.Data.Inventory.delete(id);
+            setProducts((prev) => prev.filter((p) => p.id_producto !== id));
+            showSuccess("Producto eliminado correctamente");
+          } catch (error) {
+            showError("Error", "No se pudo eliminar el producto");
+          }
+        },
+        () => {}, // Función onCancel vacía
+        "Eliminar",
+        "Cancelar"
+      );
+    };
+    // Manejo de éxito al crear o editar un producto
+    const handleSuccess = (isEdit = false) => {
+      setRefreshKey((prev) => prev + 1);
+      setIsModalVisible(false);
+      setSelectedProduct(null);
+      showSuccess(
+        isEdit
+          ? "Producto actualizado correctamente"
+          : "Producto creado correctamente"
+      );
+    }; // Componente para renderizar cada producto
+    const renderProductItem = ({ item }) => (
+      <ProductCard
+        product={item}
+        onEdit={setSelectedProduct}
+        onDelete={handleDelete}
+        suppliersMap={suppliersMap}
+      />
+    );
+    return (
+      <View style={{ flex: 1 }}>
+        {!hideSearchBar && (
+          <SearchHeaderBar
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            onButtonPress={() => setIsModalVisible(true)}
+            buttonText="Nuevo Producto"
+            buttonVariant="info"
+            buttonIconName="add-circle-outline"
+            searchPlaceholder="Buscar productos..."
+            containerStyle={styles.topBar}
           />
         )}
+        <View style={styles.container}>
+          {/* Barra superior */}
 
-        {/* Modal */}
-        <AddProductModal
-          visible={isModalVisible || !!selectedProduct}
-          onClose={() => {
-            setIsModalVisible(false);
-            setSelectedProduct(null);
-          }}
-          product={selectedProduct}
-          onCreateSuccess={handleSuccess}
-        />
+          {/* Listado */}
+          {isLoading ? (
+            <ActivityIndicator size="large" color={themeObject.colors.accent} />
+          ) : (
+            <FlatList
+              showsVerticalScrollIndicator={false}
+              data={products.filter(
+                (p) =>
+                  p.nombre_producto
+                    .toLowerCase()
+                    .includes(currentSearchQuery.toLowerCase()) ||
+                  p.descripcion
+                    .toLowerCase()
+                    .includes(currentSearchQuery.toLowerCase())
+              )}
+              keyExtractor={(item) => item.id_producto.toString()}
+              renderItem={renderProductItem}
+              ListEmptyComponent={
+                <Text style={styles.emptyText}>
+                  No hay productos registrados
+                </Text>
+              }
+            />
+          )}
+
+          {/* Modal */}
+          <AddProductModal
+            visible={isModalVisible || !!selectedProduct}
+            onClose={() => {
+              setIsModalVisible(false);
+              setSelectedProduct(null);
+            }}
+            product={selectedProduct}
+            onCreateSuccess={handleSuccess}
+          />
+        </View>
       </View>
-    </View>
-  );
-};
+    );
+  }
+);
 
 const createStyles = (theme) =>
   StyleSheet.create({

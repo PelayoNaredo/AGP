@@ -5,6 +5,23 @@ import { useTheme } from "../../../context/ThemeContext";
 import { formatPhoneNumber } from "../../../utils/helpers";
 import PopupMenu, { MenuItem } from "../../../components/popupMenu";
 
+// Función para obtener el símbolo de la moneda
+const getCurrencySymbol = (currency) => {
+  const symbols = {
+    EUR: "€",
+    USD: "$",
+    GBP: "£",
+    CHF: "₣",
+    JPY: "¥",
+    CAD: "C$",
+    AUD: "A$",
+    SEK: "kr",
+    NOK: "kr",
+    DKK: "kr",
+  };
+  return symbols[currency] || currency;
+};
+
 const SupplierCard = ({ supplier, onSelect, onDelete }) => {
   const { themeObject } = useTheme();
   const styles = createStyles(themeObject);
@@ -118,7 +135,6 @@ const SupplierCard = ({ supplier, onSelect, onDelete }) => {
                 size={20}
               />
               <Text style={styles.detailText}>
-                {" "}
                 {supplier.contacto || "Sin contacto"}
               </Text>
             </View>
@@ -129,7 +145,6 @@ const SupplierCard = ({ supplier, onSelect, onDelete }) => {
                 size={20}
               />
               <Text style={styles.detailText}>
-                {" "}
                 {supplier.telefono
                   ? formatPhoneNumber(supplier.telefono)
                   : "Sin teléfono"}
@@ -145,7 +160,6 @@ const SupplierCard = ({ supplier, onSelect, onDelete }) => {
                 size={20}
               />
               <Text style={styles.detailText}>
-                {" "}
                 {supplier.email || "Sin email"}
               </Text>
             </View>
@@ -156,10 +170,21 @@ const SupplierCard = ({ supplier, onSelect, onDelete }) => {
                 size={20}
               />
               <Text style={styles.detailText} numberOfLines={1}>
-                {" "}
                 {supplier.direccion_fiscal || "Sin dirección"}
               </Text>
             </View>
+            {supplier.moneda && (
+              <View style={styles.detailItem}>
+                <List.Icon
+                  icon="cash"
+                  color={themeObject.colors.primary}
+                  size={20}
+                />
+                <Text style={styles.detailText}>
+                  {getCurrencySymbol(supplier.moneda)} {supplier.moneda}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
         {supplier.sitio_web && (
@@ -169,7 +194,7 @@ const SupplierCard = ({ supplier, onSelect, onDelete }) => {
               color={themeObject.colors.primary}
               size={20}
             />
-            <Text style={styles.websiteText}> {supplier.sitio_web}</Text>
+            <Text style={styles.websiteText}>{supplier.sitio_web}</Text>
           </Pressable>
         )}
       </Pressable>
@@ -249,6 +274,7 @@ const createStyles = (theme) =>
       flexDirection: "row",
       alignItems: "center",
       marginBottom: 8,
+      gap: 8,
     },
     detailText: {
       color: theme.colors.text,
@@ -261,6 +287,7 @@ const createStyles = (theme) =>
       paddingVertical: 8,
       marginTop: 4,
       borderRadius: 8,
+      gap: 8,
     },
     websiteText: {
       color: theme.colors.primary,

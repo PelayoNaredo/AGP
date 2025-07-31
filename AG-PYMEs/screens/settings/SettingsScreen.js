@@ -26,6 +26,8 @@ const SettingsScreen = () => {
     useSettingsWithCache();
 
   const handleThemeChange = (theme) => {
+    // Solo actualizar el estado local para que se guarde con los otros cambios
+    // El ThemeSelector ya se encarga de aplicar el tema inmediatamente
     handleChange("tema", theme);
   };
 

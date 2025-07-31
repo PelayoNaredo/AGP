@@ -54,7 +54,8 @@ const SectionTitle = ({ icon, title, delay = 0 }) => {
 };
 
 const HomeScreen = ({ navigation }) => {
-  const { themeObject } = useTheme();
+  const { themeObject, theme } = useTheme();
+
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [dashboardData, setDashboardData] = useState(null);
@@ -213,6 +214,7 @@ const HomeScreen = ({ navigation }) => {
           data={
             dashboardData?.finanzas || { actual: {}, anterior: {}, anual: {} }
           }
+          tendenciaBalance={dashboardData?.tendenciaBalance}
           theme={themeObject.colors}
           navigation={navigation}
         />
