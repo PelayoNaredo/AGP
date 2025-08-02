@@ -1,5 +1,4 @@
-import { httpFetch } from "../http";
-import { appointmentsEndpoint } from "../endpoints";
+import { EdgeFunctions } from "../../config/supabase";
 
 // Función para formatear fechas manteniendo la zona horaria original
 const formatDateWithTimezone = (dateInput) => {
@@ -19,7 +18,11 @@ const formatDateWithTimezone = (dateInput) => {
 
 export const getAllAppointments = async () => {
   try {
-    return await httpFetch(appointmentsEndpoint.base());
+    const result = await EdgeFunctions.appointments.getAll();
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener las citas");
   } catch (error) {
     console.error("Error al obtener las citas:", error);
     throw error;
@@ -28,7 +31,11 @@ export const getAllAppointments = async () => {
 
 export const getAppointmentById = async (id) => {
   try {
-    return await httpFetch(appointmentsEndpoint.byId(id));
+    const result = await EdgeFunctions.appointments.getById(id);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener la cita");
   } catch (error) {
     console.error("Error al obtener la cita:", error);
     throw error;
@@ -37,7 +44,11 @@ export const getAppointmentById = async (id) => {
 
 export const getAppointmentsByClient = async (clientId) => {
   try {
-    return await httpFetch(appointmentsEndpoint.byClient(clientId));
+    const result = await EdgeFunctions.appointments.getByClient(clientId);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener citas del cliente");
   } catch (error) {
     console.error("Error al obtener citas del cliente:", error);
     throw error;
@@ -46,7 +57,11 @@ export const getAppointmentsByClient = async (clientId) => {
 
 export const getAppointmentsByEmployee = async (employeeId) => {
   try {
-    return await httpFetch(appointmentsEndpoint.byEmployee(employeeId));
+    const result = await EdgeFunctions.appointments.getByEmployee(employeeId);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener citas del empleado");
   } catch (error) {
     console.error("Error al obtener citas del empleado:", error);
     throw error;
@@ -93,12 +108,13 @@ export const getAppointmentsByDateRange = async (startDate, endDate) => {
       throw new Error("Fechas inválidas. Verifique el formato.");
     }
 
-    const url = appointmentsEndpoint.byDateRange(
-      encodeURIComponent(start),
-      encodeURIComponent(end)
+    const result = await EdgeFunctions.appointments.getByDateRange(start, end);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(
+      result.error || "Error al obtener citas por rango de fechas"
     );
-
-    return await httpFetch(url);
   } catch (error) {
     console.error("Error al obtener citas por rango de fechas:", error);
     throw error;
@@ -125,10 +141,11 @@ export const createAppointment = async (appointmentData) => {
         : formatDateWithTimezone(appointmentData.fecha_fin),
     };
 
-    return await httpFetch(appointmentsEndpoint.base(), {
-      method: "POST",
-      body: formattedData,
-    });
+    const result = await EdgeFunctions.appointments.create(formattedData);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al crear la cita");
   } catch (error) {
     console.error("Error al crear la cita:", error);
     throw error;
@@ -159,10 +176,11 @@ export const updateAppointment = async (id, appointmentData) => {
       }),
     };
 
-    return await httpFetch(appointmentsEndpoint.byId(id), {
-      method: "PUT",
-      body: formattedData,
-    });
+    const result = await EdgeFunctions.appointments.update(id, formattedData);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al actualizar la cita");
   } catch (error) {
     console.error("Error al actualizar la cita:", error);
     throw error;
@@ -171,10 +189,11 @@ export const updateAppointment = async (id, appointmentData) => {
 
 export const updateAppointmentStatus = async (id, status) => {
   try {
-    return await httpFetch(appointmentsEndpoint.updateStatus(id), {
-      method: "PATCH",
-      body: { estado: status },
-    });
+    const result = await EdgeFunctions.appointments.updateStatus(id, status);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al actualizar el estado de la cita");
   } catch (error) {
     console.error("Error al actualizar el estado de la cita:", error);
     throw error;
@@ -183,9 +202,11 @@ export const updateAppointmentStatus = async (id, status) => {
 
 export const deleteAppointment = async (id) => {
   try {
-    return await httpFetch(appointmentsEndpoint.byId(id), {
-      method: "DELETE",
-    });
+    const result = await EdgeFunctions.appointments.delete(id);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al eliminar la cita");
   } catch (error) {
     console.error("Error al eliminar la cita:", error);
     throw error;
@@ -214,14 +235,15 @@ export const checkEmployeeAvailability = async (
       ? endDate
       : new Date(endDate).toISOString();
 
-    return await httpFetch(
-      appointmentsEndpoint.checkAvailability(
-        employeeId,
-        formattedStartDate,
-        formattedEndDate,
-        appointmentId
-      )
+    const result = await EdgeFunctions.appointments.checkAvailability(
+      employeeId,
+      formattedStartDate,
+      formattedEndDate
     );
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al verificar disponibilidad");
   } catch (error) {
     console.error("Error al verificar disponibilidad:", error);
     throw error;

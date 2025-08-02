@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Services } from "../../../api/index";
 import { useUnifiedCache } from "../../../cache/hooks/useUnifiedCache";
 import useNotifications from "../../../hooks/useNotifications";
+import { useAuth } from "../../../context/AuthContext";
 
 // Maneja la lógica de la pantalla de gestión de citas
 const AppointmentManagerContainer = ({ children }) => {
@@ -14,6 +15,7 @@ const AppointmentManagerContainer = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { showError, showSuccess, showInfo } = useNotifications();
+  const { ensureTokenAvailable, isAuthenticated } = useAuth();
 
   // Hook del cache unificado (compatible con API anterior)
   const cache = useUnifiedCache();
@@ -98,9 +100,27 @@ const AppointmentManagerContainer = ({ children }) => {
   // Cargar datos iniciales con cache optimizado
   useEffect(() => {
     const loadData = async () => {
+      // No cargar datos si no está autenticado
+      if (!isAuthenticated) {
+        console.log("🔄 Esperando autenticación...");
+        return;
+      }
+
       try {
         setLoading(true);
         setError(null);
+
+        // Asegurar que el token esté disponible antes de proceder
+        try {
+          await ensureTokenAvailable();
+          console.log("✅ Token confirmado, procediendo con carga de datos");
+        } catch (tokenError) {
+          console.error("❌ Token no disponible:", tokenError);
+          setError(
+            "Error de autenticación. Por favor, intente refrescar la página."
+          );
+          return;
+        }
 
         // Obtener el rango de fechas para la vista actual
         const { startDate, endDate } = getDateRangeForView(
@@ -202,10 +222,12 @@ const AppointmentManagerContainer = ({ children }) => {
   }, [
     selectedDate,
     selectedView,
+    isAuthenticated,
     getAppointmentsByDateRange,
     getEmployees,
     getServices,
     getClients,
+    ensureTokenAvailable,
   ]); // Dependencias optimizadas
 
   // Crear una nueva cita

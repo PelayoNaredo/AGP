@@ -1,9 +1,12 @@
-import { httpFetch } from "../http";
-import { ordersEndpoint } from "../endpoints";
+import { EdgeFunctions } from "../../config/supabase";
 
 export const getAllOrders = async () => {
   try {
-    return await httpFetch(ordersEndpoint.base());
+    const result = await EdgeFunctions.orders.getAll();
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener las órdenes");
   } catch (error) {
     console.error("Error al obtener las órdenes:", error);
     throw error;
@@ -12,7 +15,11 @@ export const getAllOrders = async () => {
 
 export const getOrderById = async (id) => {
   try {
-    return await httpFetch(ordersEndpoint.byId(id));
+    const result = await EdgeFunctions.orders.getById(id);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener la orden");
   } catch (error) {
     console.error("Error al obtener la orden:", error);
     throw error;
@@ -21,10 +28,11 @@ export const getOrderById = async (id) => {
 
 export const createOrder = async (orderData) => {
   try {
-    return await httpFetch(ordersEndpoint.base(), {
-      method: "POST",
-      body: orderData,
-    });
+    const result = await EdgeFunctions.orders.create(orderData);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al crear la orden");
   } catch (error) {
     console.error("Error al crear la orden:", error);
     throw error;
@@ -33,10 +41,11 @@ export const createOrder = async (orderData) => {
 
 export const updateOrder = async (id, orderData) => {
   try {
-    return await httpFetch(ordersEndpoint.byId(id), {
-      method: "PUT",
-      body: orderData,
-    });
+    const result = await EdgeFunctions.orders.update(id, orderData);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al actualizar la orden");
   } catch (error) {
     console.error("Error al actualizar la orden:", error);
     throw error;
@@ -45,9 +54,11 @@ export const updateOrder = async (id, orderData) => {
 
 export const deleteOrder = async (id) => {
   try {
-    return await httpFetch(ordersEndpoint.byId(id), {
-      method: "DELETE",
-    });
+    const result = await EdgeFunctions.orders.delete(id);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al eliminar la orden");
   } catch (error) {
     console.error("Error al eliminar la orden:", error);
     throw error;

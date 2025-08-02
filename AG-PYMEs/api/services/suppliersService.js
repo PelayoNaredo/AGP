@@ -1,11 +1,14 @@
-import { httpFetch } from "../http";
-import { suppliersEndpoint } from "../endpoints";
+import { EdgeFunctions } from "../../config/supabase";
 
 const requiredFields = ["nombre_proveedor", "cif", "direccion_fiscal"];
 
 export const getSuppliers = async () => {
   try {
-    return await httpFetch(suppliersEndpoint.base());
+    const result = await EdgeFunctions.suppliers.getAll();
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener proveedores");
   } catch (error) {
     handleServiceError(error, "suppliers");
     throw error;
@@ -14,7 +17,11 @@ export const getSuppliers = async () => {
 
 export const getSupplierById = async (id) => {
   try {
-    return await httpFetch(suppliersEndpoint.byId(id));
+    const result = await EdgeFunctions.suppliers.getById(id);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener proveedor");
   } catch (error) {
     handleServiceError(error, "supplier");
     throw error;
@@ -31,10 +38,11 @@ export const createSupplier = async (supplierData) => {
       activo: supplierData.activo ?? true,
     };
 
-    return await httpFetch(suppliersEndpoint.base(), {
-      method: "POST",
-      body: body,
-    });
+    const result = await EdgeFunctions.suppliers.create(body);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al crear proveedor");
   } catch (error) {
     handleServiceError(error, "create supplier");
     throw error;
@@ -44,10 +52,11 @@ export const createSupplier = async (supplierData) => {
 export const updateSupplier = async (id, supplierData) => {
   try {
     validateRequiredFields(supplierData);
-    return await httpFetch(suppliersEndpoint.byId(id), {
-      method: "PUT",
-      body: supplierData,
-    });
+    const result = await EdgeFunctions.suppliers.update(id, supplierData);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al actualizar proveedor");
   } catch (error) {
     handleServiceError(error, "update supplier");
     throw error;
@@ -56,9 +65,11 @@ export const updateSupplier = async (id, supplierData) => {
 
 export const deleteSupplier = async (id) => {
   try {
-    return await httpFetch(suppliersEndpoint.byId(id), {
-      method: "DELETE",
-    });
+    const result = await EdgeFunctions.suppliers.delete(id);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al eliminar proveedor");
   } catch (error) {
     handleServiceError(error, "delete supplier");
     throw error;

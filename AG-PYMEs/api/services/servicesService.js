@@ -1,10 +1,12 @@
-import { httpFetch } from "../http";
-import { servicesEndpoint } from "../endpoints";
+import { EdgeFunctions } from "../../config/supabase";
 
 export const getAllServices = async () => {
   try {
-    const response = await httpFetch(servicesEndpoint.base());
-    return Array.isArray(response) ? response : [];
+    const result = await EdgeFunctions.services.getAll();
+    if (result.success) {
+      return Array.isArray(result.data) ? result.data : [];
+    }
+    return [];
   } catch (error) {
     console.error("Error al obtener los servicios:", error);
     return []; // Devolver array vacío en caso de error
@@ -13,7 +15,13 @@ export const getAllServices = async () => {
 
 export const getAllServicesAdmin = async () => {
   try {
-    return await httpFetch(servicesEndpoint.admin());
+    const result = await EdgeFunctions.services.getAllAdmin();
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(
+      result.error || "Error al obtener todos los servicios (admin)"
+    );
   } catch (error) {
     console.error("Error al obtener todos los servicios (admin):", error);
     throw error;
@@ -22,7 +30,11 @@ export const getAllServicesAdmin = async () => {
 
 export const getServiceById = async (id) => {
   try {
-    return await httpFetch(servicesEndpoint.byId(id));
+    const result = await EdgeFunctions.services.getById(id);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener el servicio");
   } catch (error) {
     console.error("Error al obtener el servicio:", error);
     throw error;
@@ -41,10 +53,11 @@ export const createService = async (serviceData) => {
       );
     }
 
-    return await httpFetch(servicesEndpoint.base(), {
-      method: "POST",
-      body: serviceData, // httpFetch ya se encargará de la serialización
-    });
+    const result = await EdgeFunctions.services.create(serviceData);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al crear el servicio");
   } catch (error) {
     console.error("Error al crear el servicio:", error);
     throw error;
@@ -63,10 +76,11 @@ export const updateService = async (id, serviceData) => {
       );
     }
 
-    return await httpFetch(servicesEndpoint.byId(id), {
-      method: "PUT",
-      body: serviceData, // httpFetch ya se encargará de la serialización
-    });
+    const result = await EdgeFunctions.services.update(id, serviceData);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al actualizar el servicio");
   } catch (error) {
     console.error("Error al actualizar el servicio:", error);
     throw error;
@@ -75,10 +89,11 @@ export const updateService = async (id, serviceData) => {
 
 export const deleteService = async (id) => {
   try {
-    const response = await httpFetch(servicesEndpoint.byId(id), {
-      method: "DELETE",
-    });
-    return response;
+    const result = await EdgeFunctions.services.delete(id);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al eliminar el servicio");
   } catch (error) {
     console.error("Error al eliminar el servicio:", error);
     throw error;
@@ -87,7 +102,11 @@ export const deleteService = async (id) => {
 
 export const getServicesByCategory = async (category) => {
   try {
-    return await httpFetch(servicesEndpoint.byCategory(category));
+    const result = await EdgeFunctions.services.getByCategory(category);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener servicios por categoría");
   } catch (error) {
     console.error("Error al obtener servicios por categoría:", error);
     throw error;
@@ -99,7 +118,11 @@ export const searchServices = async (term, activeOnly = true) => {
     if (!term) {
       return activeOnly ? await getAllServices() : await getAllServicesAdmin();
     }
-    return await httpFetch(servicesEndpoint.search(term, activeOnly));
+    const result = await EdgeFunctions.services.search(term);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al buscar servicios");
   } catch (error) {
     console.error("Error al buscar servicios:", error);
     throw error;

@@ -1,299 +1,230 @@
-//Módulo principal para unificar todos los servicios
+//Módulo principal para unificar todos los servicios usando EdgeFunctions
 
-// Importar servicios rediseñados
+// Importar el nuevo servicio unificado de EdgeFunctions
+import EdgeFunctionsAPI, {
+  authService,
+  companiesService,
+  alertsService,
+  clientsService,
+  employeesService,
+  appointmentsService,
+  inventoryService,
+  dashboardService,
+  servicesService,
+  expensesService,
+  incomeService,
+  leavesService,
+  ordersService,
+  orderDetailsService,
+  salesService,
+  settingsService,
+  shiftsService,
+  suppliersService,
+  usersService,
+  filesService,
+} from "./edgeFunctionsService";
+
+// Importar servicios rediseñados que no tienen EdgeFunction equivalente
 import { BaseStorage, TokenStorage, ImageStorage } from "./services/storage";
 import AuthService from "./services/authService";
 import FileService from "./services/file";
-
-// Importar servicio de alertas con cache
-import {
-  getAlerts,
-  getAlertById,
-  createAlert,
-  updateAlert,
-  deleteAlert,
-} from "./services/alertsService";
-import {
-  getAllAppointments,
-  getAppointmentById,
-  getAppointmentsByClient,
-  getAppointmentsByEmployee,
-  getAppointmentsByDateRange,
-  createAppointment,
-  updateAppointment,
-  updateAppointmentStatus,
-  deleteAppointment,
-  checkEmployeeAvailability,
-} from "./services/appointmentsService";
-import {
-  getAllClients,
-  getClientById,
-  createClient,
-  updateClient,
-  deleteClient,
-} from "./services/clientsService";
-import {
-  getDashboardData,
-  invalidateDashboardCache,
-} from "./services/dashboardService";
-import {
-  getAllEmployees,
-  getEmployeeById,
-  createEmployee,
-  updateEmployee,
-  deleteEmployee,
-} from "./services/employeesService";
-import {
-  getExpenses,
-  getExpenseById,
-  createExpense,
-  updateExpense,
-  deleteExpense,
-  getExpensesByMonth,
-  getExpensesPaginated,
-} from "./services/expensesService";
-import {
-  getIncomes,
-  getIncomeById,
-  createIncome,
-  updateIncome,
-  deleteIncome,
-} from "./services/incomesService";
-import {
-  getAllInventory,
-  getProductById,
-  createProduct,
-  updateProduct,
-  deleteProduct,
-} from "./services/inventoryService";
-import {
-  getLeaves,
-  getLeaveById,
-  createLeave,
-  updateLeave,
-  deleteLeave,
-} from "./services/leavesService";
-import {
-  getAllOrderDetails,
-  getOrderDetailById,
-  createOrderDetail,
-  updateOrderDetail,
-  deleteOrderDetail,
-} from "./services/orderDetailService";
-import {
-  getAllOrders,
-  getOrderById,
-  createOrder,
-  updateOrder,
-  deleteOrder,
-} from "./services/ordersService";
-import {
-  getAllSales,
-  getSaleById,
-  createSale,
-  updateSale,
-  deleteSale,
-  updateSaleStatus,
-  getSalesByClient,
-  getSalesByEmployee,
-  getSalesByDateRange,
-  generateSaleDocument,
-  updateInventoryQuantities,
-  executeDailyClosure,
-  checkDailyClosure,
-} from "./services/salesService";
-import {
-  getAllServices,
-  getServiceById,
-  getAllServicesAdmin,
-  createService,
-  updateService,
-  deleteService,
-  getServicesByCategory,
-  searchServices,
-} from "./services/servicesService";
-import {
-  getSettingById,
-  createSetting,
-  updateSetting,
-} from "./services/settingsService";
-import {
-  getAllShifts,
-  getShiftById,
-  getShiftByDate,
-  getShiftsByMonth,
-  saveShift,
-  deleteShift,
-  deleteShiftInterval,
-  getShiftsWithEmployeeInfo,
-  getMonthlyShiftsForExport,
-  copyShiftsFromPreviousWeek,
-} from "./services/shiftsService";
-import {
-  getSuppliers,
-  getSupplierById,
-  createSupplier,
-  updateSupplier,
-  deleteSupplier,
-} from "./services/suppliersService";
-import { createUser } from "./services/usersService";
+import CompanyService from "./services/CompanyService";
 
 // Importar componentes rediseñados
 import ImageWithAuth from "../components/ImageWithAuth";
 
-//API unificada para todos los servicios
+//API unificada para todos los servicios usando EdgeFunctions
 const Services = {
-  //Servicios de autenticación
-  Auth: AuthService,
+  //Servicios de autenticación - Migrado a EdgeFunctions
+  Auth: {
+    ...AuthService, // Mantener AuthService original para compatibilidad
+    // Nuevos métodos con EdgeFunctions
+    login: authService.login,
+    register: authService.register,
+  },
 
-  //Servicios para el manejo de datos
+  //Servicios para el manejo de datos - Migrados a EdgeFunctions
   Data: {
-    //Servicio de alertas
+    //Servicio de empresas - Migrado a EdgeFunctions
+    Companies: {
+      ...CompanyService, // Mantener CompanyService original para compatibilidad
+      // Nuevos métodos con EdgeFunctions
+      getAll: companiesService.getAll,
+      getById: companiesService.getById,
+      getCurrent: companiesService.getCurrent,
+      getUsage: companiesService.getUsage,
+    },
+
+    //Servicio de alertas - Migrado a EdgeFunctions
     Alerts: {
-      getById: getAlertById,
-      getAll: getAlerts,
-      create: createAlert,
-      update: updateAlert,
-      delete: deleteAlert,
-    }, //Servicio de citas
+      getById: alertsService.getById,
+      getAll: alertsService.getAll,
+      create: alertsService.create,
+      update: alertsService.update,
+      delete: alertsService.delete,
+    },
+
+    //Servicio de citas - Migrado a EdgeFunctions
     Appointments: {
-      getAll: getAllAppointments,
-      getById: getAppointmentById,
-      getByClient: getAppointmentsByClient,
-      getByEmployee: getAppointmentsByEmployee,
-      getByDateRange: getAppointmentsByDateRange,
-      create: createAppointment,
-      update: updateAppointment,
-      updateStatus: updateAppointmentStatus,
-      delete: deleteAppointment,
-      checkAvailability: checkEmployeeAvailability,
+      getAll: appointmentsService.getAll,
+      getById: appointmentsService.getById,
+      getByClient: appointmentsService.getByClient,
+      getByEmployee: appointmentsService.getByEmployee,
+      getByDateRange: appointmentsService.getByDateRange,
+      create: appointmentsService.create,
+      update: appointmentsService.update,
+      updateStatus: appointmentsService.updateStatus,
+      delete: appointmentsService.delete,
+      checkAvailability: appointmentsService.checkAvailability,
     },
-    //Servicio de clientes
+
+    //Servicio de clientes - Migrado a EdgeFunctions
     Clients: {
-      getAll: getAllClients,
-      getById: getClientById,
-      create: createClient,
-      update: updateClient,
-      delete: deleteClient,
+      getAll: clientsService.getAll,
+      getById: clientsService.getById,
+      create: clientsService.create,
+      update: clientsService.update,
+      delete: clientsService.delete,
     },
-    //Servicio del dashboard
+
+    //Servicio de dashboard - Migrado a EdgeFunctions
     Dashboard: {
-      getData: getDashboardData,
-      invalidateCache: invalidateDashboardCache,
+      getData: dashboardService.getData,
+      getFinancial: dashboardService.getFinancial,
+      getTrend: dashboardService.getTrend,
+      getInventory: dashboardService.getInventory,
     },
-    //Servicio de empleados
+
+    //Servicio de empleados - Migrado a EdgeFunctions
     Employees: {
-      getAll: getAllEmployees,
-      getById: getEmployeeById,
-      create: createEmployee,
-      update: updateEmployee,
-      delete: deleteEmployee,
+      getAll: employeesService.getAll,
+      getById: employeesService.getById,
+      create: employeesService.create,
+      update: employeesService.update,
+      delete: employeesService.delete,
     },
-    //Servicio de gastos
+
+    //Servicios de gastos - Migrado a EdgeFunctions
     Expenses: {
-      getAll: getExpenses,
-      getById: getExpenseById,
-      getByMonth: getExpensesByMonth,
-      getPaginated: getExpensesPaginated,
-      create: createExpense,
-      update: updateExpense,
-      delete: deleteExpense,
+      getAll: expensesService.getAll,
+      getById: expensesService.getById,
+      create: expensesService.create,
+      update: expensesService.update,
+      delete: expensesService.delete,
+      getByMonth: expensesService.getByMonth,
+      getPaginated: expensesService.getPaginated,
     },
-    //Servicio de ingresos
+
+    //Servicios de ingresos - Migrado a EdgeFunctions
     Incomes: {
-      getAll: getIncomes,
-      getById: getIncomeById,
-      create: createIncome,
-      update: updateIncome,
-      delete: deleteIncome,
+      getAll: incomeService.getAll,
+      getById: incomeService.getById,
+      create: incomeService.create,
+      update: incomeService.update,
+      delete: incomeService.delete,
     },
-    //Servicio de inventario
+
+    //Servicio de inventario - Migrado a EdgeFunctions
     Inventory: {
-      getAll: getAllInventory,
-      getById: getProductById,
-      create: createProduct,
-      update: updateProduct,
-      delete: deleteProduct,
+      getAll: inventoryService.getAll,
+      getById: inventoryService.getById,
+      create: inventoryService.create,
+      update: inventoryService.update,
+      delete: inventoryService.delete,
     },
-    //Servicio de ausencias
+
+    //Servicios de ausencias - Migrado a EdgeFunctions
     Leaves: {
-      getAll: getLeaves,
-      getById: getLeaveById,
-      create: createLeave,
-      update: updateLeave,
-      delete: deleteLeave,
+      getAll: leavesService.getAll,
+      getById: leavesService.getById,
+      create: leavesService.create,
+      update: leavesService.update,
+      delete: leavesService.delete,
     },
-    //Servicio de detalles de órdenes
+
+    //Servicios de detalles de órdenes - Migrado a EdgeFunctions
     OrderDetails: {
-      getAll: getAllOrderDetails,
-      getById: getOrderDetailById,
-      create: createOrderDetail,
-      update: updateOrderDetail,
-      delete: deleteOrderDetail,
+      getAll: orderDetailsService.getAll,
+      getById: orderDetailsService.getById,
+      create: orderDetailsService.create,
+      update: orderDetailsService.update,
+      delete: orderDetailsService.delete,
     },
-    //Servicio de órdenes
+
+    //Servicios de órdenes - Migrado a EdgeFunctions
     Orders: {
-      getAll: getAllOrders,
-      getById: getOrderById,
-      create: createOrder,
-      update: updateOrder,
-      delete: deleteOrder,
+      getAll: ordersService.getAll,
+      getById: ordersService.getById,
+      create: ordersService.create,
+      update: ordersService.update,
+      delete: ordersService.delete,
     },
-    //Servicio de ventas
+
+    //Servicios de ventas - Migrado a EdgeFunctions
     Sales: {
-      getAll: getAllSales,
-      getById: getSaleById,
-      getByClient: getSalesByClient,
-      getByEmployee: getSalesByEmployee,
-      getByDateRange: getSalesByDateRange,
-      create: createSale,
-      update: updateSale,
-      updateStatus: updateSaleStatus,
-      delete: deleteSale,
-      generateSaleDocument,
-      updateInventoryQuantities,
-      executeDailyClosure,
-      checkDailyClosure,
+      getAll: salesService.getAll,
+      getById: salesService.getById,
+      getByClient: salesService.getByClient,
+      getByEmployee: salesService.getByEmployee,
+      getByDateRange: salesService.getByDateRange,
+      create: salesService.create,
+      update: salesService.update,
+      updateStatus: salesService.updateStatus,
+      delete: salesService.delete,
+      generateDocument: salesService.generateDocument,
+      updateInventory: salesService.updateInventory,
+      executeDailyClosure: salesService.executeDailyClosure,
+      checkDailyClosure: salesService.checkDailyClosure,
     },
-    //Servicio de servicios ofrecidos
+
+    //Servicio de servicios ofrecidos - Migrado a EdgeFunctions
     Services: {
-      getAll: getAllServices,
-      getById: getServiceById,
-      getAllAdmin: getAllServicesAdmin,
-      getByCategory: getServicesByCategory,
-      search: searchServices,
-      create: createService,
-      update: updateService,
-      delete: deleteService,
-    }, //Servicio de configuraciones
+      getAll: servicesService.getAll,
+      getById: servicesService.getById,
+      getAllAdmin: servicesService.getAllAdmin,
+      create: servicesService.create,
+      update: servicesService.update,
+      delete: servicesService.delete,
+    },
+
+    //Servicios de configuraciones - Migrado a EdgeFunctions
     Settings: {
-      getById: getSettingById,
-      create: createSetting,
-      update: updateSetting,
-    }, //Servicio de turnos
+      getAll: settingsService.getAll,
+      getById: settingsService.getById,
+      create: settingsService.create,
+      update: settingsService.update,
+    },
+
+    //Servicios de turnos - Migrado a EdgeFunctions
     Shifts: {
-      getAll: getAllShifts,
-      getById: getShiftById,
-      getByDate: getShiftByDate,
-      getByMonth: getShiftsByMonth,
-      save: saveShift,
-      delete: deleteShift,
-      deleteInterval: deleteShiftInterval,
-      getShiftsWithEmployeeInfo: getShiftsWithEmployeeInfo,
-      getMonthlyShiftsForExport: getMonthlyShiftsForExport,
-      copyShiftsFromPreviousWeek: copyShiftsFromPreviousWeek,
+      getAll: shiftsService.getAll,
+      getById: shiftsService.getById,
+      getByDate: shiftsService.getByDate,
+      getByMonth: shiftsService.getByMonth,
+      save: shiftsService.save,
+      delete: shiftsService.delete,
+      deleteInterval: shiftsService.deleteInterval,
+      getWithEmployeeInfo: shiftsService.getWithEmployeeInfo,
+      getMonthlyForExport: shiftsService.getMonthlyForExport,
+      copyFromPreviousWeek: shiftsService.copyFromPreviousWeek,
     },
-    //Servicio de proveedores
+
+    //Servicios de proveedores - Migrado a EdgeFunctions
     Suppliers: {
-      getAll: getSuppliers,
-      getById: getSupplierById,
-      create: createSupplier,
-      update: updateSupplier,
-      delete: deleteSupplier,
+      getAll: suppliersService.getAll,
+      getById: suppliersService.getById,
+      create: suppliersService.create,
+      update: suppliersService.update,
+      delete: suppliersService.delete,
     },
-    //Servicio de usuarios
+
+    //Servicios de usuarios - Migrado a EdgeFunctions
     Users: {
-      create: createUser,
+      getAll: usersService.getAll,
+      getById: usersService.getById,
+      create: usersService.create,
+      update: usersService.update,
+      delete: usersService.delete,
     },
   },
 
@@ -303,195 +234,155 @@ const Services = {
     Token: TokenStorage,
     Image: ImageStorage,
   },
+
   //Servicios de archivos
   File: {
-    // Redefinimos los métodos con nombres más intuitivos
-    normalizeUrl:
-      FileService.normalizeUrl || FileService.normalizeImageUrl || null,
-    normalizeImageUrl: FileService.normalizeImageUrl || null,
-    createSignedUrl:
-      FileService.createSignedUrl || FileService.createSignedImageUrl || null,
-    createSignedImageUrl: FileService.createSignedImageUrl || null,
-    download: FileService.download || FileService.downloadFile || null,
-    downloadFile: FileService.downloadFile || null,
-    delete: FileService.delete || FileService.deleteFile || null,
-    deleteFile: FileService.deleteFile || null,
-    upload: FileService.upload || FileService.uploadFile || null,
-    uploadFile: FileService.uploadFile || null,
-    loadImage: FileService.loadImage || FileService.load || null,
-    getFilenameFromUrl:
-      FileService.getFilenameFromUrl || FileService.getFilename || null,
+    ...FileService,
+    getSignedUrl: filesService.getSignedUrl,
   },
+
+  //Componentes
+  Components: {
+    ImageWithAuth,
+  },
+
+  // EdgeFunctions API directa (para casos avanzados)
+  EdgeFunctions: EdgeFunctionsAPI,
 };
 
-//Componentes
-const Components = {
-  ImageWithAuth,
-};
+// Funciones auxiliares para compatibilidad con el sistema anterior
+export const getAlerts = alertsService.getAll;
+export const getAlertById = alertsService.getById;
+export const createAlert = alertsService.create;
+export const updateAlert = alertsService.update;
+export const deleteAlert = alertsService.delete;
 
-// Exportar servicios y componentes
+export const getAllAppointments = appointmentsService.getAll;
+export const getAppointmentById = appointmentsService.getById;
+export const getAppointmentsByClient = appointmentsService.getByClient;
+export const getAppointmentsByEmployee = appointmentsService.getByEmployee;
+export const getAppointmentsByDateRange = appointmentsService.getByDateRange;
+export const createAppointment = appointmentsService.create;
+export const updateAppointment = appointmentsService.update;
+export const updateAppointmentStatus = appointmentsService.updateStatus;
+export const deleteAppointment = appointmentsService.delete;
+export const checkEmployeeAvailability = appointmentsService.checkAvailability;
+
+export const getAllClients = clientsService.getAll;
+export const getClientById = clientsService.getById;
+export const createClient = clientsService.create;
+export const updateClient = clientsService.update;
+export const deleteClient = clientsService.delete;
+
+export const getDashboardData = dashboardService.getData;
+export const invalidateDashboardCache = () =>
+  console.log("Cache invalidation not needed with EdgeFunctions");
+
+export const getAllEmployees = employeesService.getAll;
+export const getEmployeeById = employeesService.getById;
+export const createEmployee = employeesService.create;
+export const updateEmployee = employeesService.update;
+export const deleteEmployee = employeesService.delete;
+
+export const getAllInventory = inventoryService.getAll;
+export const getProductById = inventoryService.getById;
+export const createProduct = inventoryService.create;
+export const updateProduct = inventoryService.update;
+export const deleteProduct = inventoryService.delete;
+
+export const getAllServices = servicesService.getAll;
+export const getServiceById = servicesService.getById;
+export const getAllServicesAdmin = servicesService.getAllAdmin;
+export const createService = servicesService.create;
+export const updateService = servicesService.update;
+export const deleteService = servicesService.delete;
+export const getServicesByCategory = (category) => servicesService.getAll(); // Temporal
+export const searchServices = (query) => servicesService.getAll(); // Temporal
+
+// Re-exportar servicios migrados a EdgeFunctions para compatibilidad
+export const getExpenses = expensesService.getAll;
+export const getExpenseById = expensesService.getById;
+export const createExpense = expensesService.create;
+export const updateExpense = expensesService.update;
+export const deleteExpense = expensesService.delete;
+export const getExpensesByMonth = expensesService.getByMonth;
+export const getExpensesPaginated = expensesService.getPaginated;
+
+export const getIncomes = incomeService.getAll;
+export const getIncomeById = incomeService.getById;
+export const createIncome = incomeService.create;
+export const updateIncome = incomeService.update;
+export const deleteIncome = incomeService.delete;
+
+export const getLeaves = leavesService.getAll;
+export const getLeaveById = leavesService.getById;
+export const createLeave = leavesService.create;
+export const updateLeave = leavesService.update;
+export const deleteLeave = leavesService.delete;
+
+export const getAllOrderDetails = orderDetailsService.getAll;
+export const getOrderDetailById = orderDetailsService.getById;
+export const createOrderDetail = orderDetailsService.create;
+export const updateOrderDetail = orderDetailsService.update;
+export const deleteOrderDetail = orderDetailsService.delete;
+
+export const getAllOrders = ordersService.getAll;
+export const getOrderById = ordersService.getById;
+export const createOrder = ordersService.create;
+export const updateOrder = ordersService.update;
+export const deleteOrder = ordersService.delete;
+
+export const getAllSales = salesService.getAll;
+export const getSaleById = salesService.getById;
+export const createSale = salesService.create;
+export const updateSale = salesService.update;
+export const deleteSale = salesService.delete;
+export const updateSaleStatus = salesService.updateStatus;
+export const getSalesByClient = salesService.getByClient;
+export const getSalesByEmployee = salesService.getByEmployee;
+export const getSalesByDateRange = salesService.getByDateRange;
+export const generateSaleDocument = salesService.generateDocument;
+export const updateInventoryQuantities = salesService.updateInventory;
+export const executeDailyClosure = salesService.executeDailyClosure;
+export const checkDailyClosure = salesService.checkDailyClosure;
+
+export const getSettingById = settingsService.getById;
+export const createSetting = settingsService.create;
+export const updateSetting = settingsService.update;
+
+export const getAllShifts = shiftsService.getAll;
+export const getShiftById = shiftsService.getById;
+export const getShiftByDate = shiftsService.getByDate;
+export const getShiftsByMonth = shiftsService.getByMonth;
+export const saveShift = shiftsService.save;
+export const deleteShift = shiftsService.delete;
+export const deleteShiftInterval = shiftsService.deleteInterval;
+export const getShiftsWithEmployeeInfo = shiftsService.getWithEmployeeInfo;
+export const getMonthlyShiftsForExport = shiftsService.getMonthlyForExport;
+export const copyShiftsFromPreviousWeek = shiftsService.copyFromPreviousWeek;
+
+export const getSuppliers = suppliersService.getAll;
+export const getSupplierById = suppliersService.getById;
+export const createSupplier = suppliersService.create;
+export const updateSupplier = suppliersService.update;
+export const deleteSupplier = suppliersService.delete;
+
+export const createUser = usersService.create;
+
+// Exportar servicios rediseñados
 export {
-  Services,
-  Components,
-
-  // Exportaciones directas para compatibilidad con el código existente
-  // Auth
-  AuthService,
-
-  // Storage
   BaseStorage,
   TokenStorage,
   ImageStorage,
-
-  // File
+  AuthService,
   FileService,
-
-  // Alertas
-  getAlertById,
-  getAlerts,
-  createAlert,
-  updateAlert,
-  deleteAlert,
-  // Citas
-  getAllAppointments,
-  getAppointmentById,
-  getAppointmentsByClient,
-  getAppointmentsByEmployee,
-  getAppointmentsByDateRange,
-  createAppointment,
-  updateAppointment,
-  updateAppointmentStatus,
-  deleteAppointment,
-  checkEmployeeAvailability,
-
-  // Clientes
-  getAllClients,
-  getClientById,
-  createClient,
-  updateClient,
-  deleteClient,
-
-  // Dashboard
-  getDashboardData,
-
-  // Empleados
-  getAllEmployees,
-  getEmployeeById,
-  createEmployee,
-  updateEmployee,
-  deleteEmployee,
-
-  // Gastos
-  getExpenses,
-  getExpenseById,
-  createExpense,
-  updateExpense,
-  deleteExpense,
-  getExpensesByMonth,
-  getExpensesPaginated,
-
-  // Ingresos
-  getIncomes,
-  getIncomeById,
-  createIncome,
-  updateIncome,
-  deleteIncome,
-
-  // Inventario
-  getAllInventory,
-  getProductById,
-  createProduct,
-  updateProduct,
-  deleteProduct,
-
-  // Ausencias
-  getLeaves,
-  getLeaveById,
-  createLeave,
-  updateLeave,
-  deleteLeave,
-
-  // Detalles de órdenes
-  getAllOrderDetails,
-  getOrderDetailById,
-  createOrderDetail,
-  updateOrderDetail,
-  deleteOrderDetail,
-
-  // Órdenes
-  getAllOrders,
-  getOrderById,
-  createOrder,
-  updateOrder,
-  deleteOrder,
-
-  // Ventas
-  getAllSales,
-  getSaleById,
-  createSale,
-  updateSale,
-  deleteSale,
-  updateSaleStatus,
-  getSalesByClient,
-  getSalesByEmployee,
-  getSalesByDateRange,
-  generateSaleDocument,
-  updateInventoryQuantities,
-  executeDailyClosure,
-  checkDailyClosure,
-
-  // Servicios
-  getAllServices,
-  getServiceById,
-  getAllServicesAdmin,
-  createService,
-  updateService,
-  deleteService,
-  getServicesByCategory,
-  searchServices,
-  // Configuraciones
-  getSettingById,
-  createSetting,
-  updateSetting,
-
-  // Turnos
-  // Turnos
-  getAllShifts,
-  getShiftById,
-  getShiftByDate,
-  getShiftsByMonth,
-  saveShift,
-  deleteShift,
-  deleteShiftInterval,
-  getShiftsWithEmployeeInfo,
-  getMonthlyShiftsForExport,
-  copyShiftsFromPreviousWeek,
-
-  // Proveedores
-  getSuppliers,
-  getSupplierById,
-  createSupplier,
-  updateSupplier,
-  deleteSupplier,
-
-  // Usuarios
-  createUser,
-
-  // Componentes
+  CompanyService,
   ImageWithAuth,
 };
 
-// Exportación por defecto
-export default {
-  Services,
-  Components,
-  initialize: async () => {
-    try {
-      // Aquí puedes añadir lógica de inicialización si es necesaria
-      return true;
-    } catch (error) {
-      console.error("Error al inicializar servicios:", error);
-      return false;
-    }
-  },
+// Exportar Components para destructuración directa
+export const Components = {
+  ImageWithAuth,
 };
+
+export default Services;

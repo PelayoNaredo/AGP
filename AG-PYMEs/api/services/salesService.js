@@ -1,5 +1,4 @@
-import { httpFetch } from "../http";
-import { salesEndpoint } from "../endpoints";
+import { EdgeFunctions } from "../../config/supabase";
 
 // Función para mejorar el manejo de errores
 const handleFetchError = (error, action) => {
@@ -25,17 +24,11 @@ const handleFetchError = (error, action) => {
 // Función para ejecutar el cierre diario de ventas
 export const executeDailyClosure = async (date, total, notes = "") => {
   try {
-    return await httpFetch("/api/income/daily-closure", {
-      method: "POST",
-      body: {
-        fecha_ingreso: date,
-        ingresos: total,
-        concepto: "Cierre Diario",
-        categoria: "cierre",
-        comentarios: `Cierre diario ${date}${notes ? ": " + notes : ""}`,
-        metodo_ingreso: "multiple",
-      },
-    });
+    const result = await EdgeFunctions.sales.executeDailyClosure();
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al ejecutar el cierre diario");
   } catch (error) {
     handleFetchError(error, "ejecutar el cierre diario");
   }
@@ -43,7 +36,11 @@ export const executeDailyClosure = async (date, total, notes = "") => {
 
 export const getAllSales = async () => {
   try {
-    return await httpFetch(salesEndpoint.base());
+    const result = await EdgeFunctions.sales.getAll();
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener las ventas");
   } catch (error) {
     handleFetchError(error, "obtener las ventas");
   }
@@ -51,7 +48,11 @@ export const getAllSales = async () => {
 
 export const getSaleById = async (id) => {
   try {
-    return await httpFetch(salesEndpoint.byId(id));
+    const result = await EdgeFunctions.sales.getById(id);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener la venta");
   } catch (error) {
     handleFetchError(error, "obtener la venta");
   }
@@ -124,10 +125,11 @@ export const createSale = async (saleData) => {
     // Siempre usar el total calculado para evitar problemas con la restricción CHECK
     saleData.total = Number(totalCalculado.toFixed(2));
 
-    return await httpFetch(salesEndpoint.base(), {
-      method: "POST",
-      body: saleData,
-    });
+    const result = await EdgeFunctions.sales.create(saleData);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al crear la venta");
   } catch (error) {
     handleFetchError(error, "crear la venta");
   }
@@ -135,10 +137,11 @@ export const createSale = async (saleData) => {
 
 export const updateSale = async (id, saleData) => {
   try {
-    return await httpFetch(salesEndpoint.byId(id), {
-      method: "PUT",
-      body: saleData,
-    });
+    const result = await EdgeFunctions.sales.update(id, saleData);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al actualizar la venta");
   } catch (error) {
     console.error("Error al actualizar la venta:", error);
     throw error;
@@ -147,9 +150,11 @@ export const updateSale = async (id, saleData) => {
 
 export const deleteSale = async (id) => {
   try {
-    return await httpFetch(salesEndpoint.byId(id), {
-      method: "DELETE",
-    });
+    const result = await EdgeFunctions.sales.delete(id);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al eliminar la venta");
   } catch (error) {
     console.error("Error al eliminar la venta:", error);
     throw error;
@@ -158,10 +163,13 @@ export const deleteSale = async (id) => {
 
 export const updateSaleStatus = async (id, status) => {
   try {
-    return await httpFetch(salesEndpoint.updateStatus(id), {
-      method: "PATCH",
-      body: { estado: status },
-    });
+    const result = await EdgeFunctions.sales.updateStatus(id, status);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(
+      result.error || "Error al actualizar el estado de la venta"
+    );
   } catch (error) {
     console.error("Error al actualizar el estado de la venta:", error);
     throw error;
@@ -170,7 +178,11 @@ export const updateSaleStatus = async (id, status) => {
 
 export const getSalesByClient = async (clientId) => {
   try {
-    return await httpFetch(salesEndpoint.byClient(clientId));
+    const result = await EdgeFunctions.sales.getByClient(clientId);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener ventas del cliente");
   } catch (error) {
     console.error("Error al obtener ventas del cliente:", error);
     throw error;
@@ -179,7 +191,11 @@ export const getSalesByClient = async (clientId) => {
 
 export const getSalesByEmployee = async (employeeId) => {
   try {
-    return await httpFetch(salesEndpoint.byEmployee(employeeId));
+    const result = await EdgeFunctions.sales.getByEmployee(employeeId);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener ventas del empleado");
   } catch (error) {
     console.error("Error al obtener ventas del empleado:", error);
     throw error;
@@ -199,8 +215,15 @@ export const getSalesByDateRange = async (startDate, endDate) => {
         ? endDate.toISOString().split("T")[0]
         : endDate;
 
-    return await httpFetch(
-      salesEndpoint.byDateRange(formattedStartDate, formattedEndDate)
+    const result = await EdgeFunctions.sales.getByDateRange(
+      formattedStartDate,
+      formattedEndDate
+    );
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(
+      result.error || "Error al obtener ventas por rango de fechas"
     );
   } catch (error) {
     console.error("Error al obtener ventas por rango de fechas:", error);
@@ -210,9 +233,11 @@ export const getSalesByDateRange = async (startDate, endDate) => {
 
 export const generateSaleDocument = async (saleId, documentType) => {
   try {
-    return await httpFetch(
-      `${salesEndpoint.byId(saleId)}/document?type=${documentType}`
-    );
+    const result = await EdgeFunctions.sales.generateDocument(saleId);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al generar documento de venta");
   } catch (error) {
     console.error("Error al generar documento de venta:", error);
     throw error;
@@ -222,10 +247,11 @@ export const generateSaleDocument = async (saleId, documentType) => {
 // Función para actualizar el inventario después de una venta
 export const updateInventoryQuantities = async (productsData) => {
   try {
-    return await httpFetch("/api/inventory/update-sale-quantities", {
-      method: "POST",
-      body: { productos: productsData },
-    });
+    const result = await EdgeFunctions.sales.updateInventory(productsData);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al actualizar el inventario");
   } catch (error) {
     console.error("Error al actualizar el inventario:", error);
     throw error;
@@ -235,7 +261,11 @@ export const updateInventoryQuantities = async (productsData) => {
 // Función para verificar si existe un cierre diario para una fecha
 export const checkDailyClosure = async (formattedDate) => {
   try {
-    return await httpFetch(`/api/income/daily-closure/${formattedDate}`);
+    const result = await EdgeFunctions.sales.checkDailyClosure();
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al verificar el cierre diario");
   } catch (error) {
     handleFetchError(error, "verificar el cierre diario");
   }

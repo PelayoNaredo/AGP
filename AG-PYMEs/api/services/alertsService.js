@@ -1,10 +1,9 @@
-import { httpFetch } from "../http";
-import { alertsEndpoint } from "../endpoints";
+import { EdgeFunctions } from "../../config/supabase";
 import { createServiceAdapter } from "../../cache/adapters/ServiceAdapter.js";
 
 /**
- * Alerts Service con Sistema de Cache Unificado
- * Implementa caché inteligente y actualizaciones optimistas usando el nuevo sistema
+ * Alerts Service con Edge Functions de Supabase
+ * Sistema de cache unificado y actualización optimista migrado a Supabase
  */
 
 // Instancia del adaptador de cache para alerts
@@ -21,12 +20,18 @@ const initializeCache = () => {
 // Control de llamadas simultáneas para evitar duplicados
 let pendingRequest = null;
 
-// Función original para obtener alertas del servidor
-const fetchAlertsFromServer = async () => {
+// Función para obtener alertas desde Edge Functions
+const fetchAlertsFromEdgeFunction = async () => {
   try {
-    return await httpFetch(alertsEndpoint.base());
+    const result = await EdgeFunctions.alerts.getAll();
+
+    if (result.success) {
+      return result.data;
+    } else {
+      throw new Error(result.error || "Error obteniendo alertas");
+    }
   } catch (error) {
-    console.error("Error al obtener las alertas del servidor:", error);
+    console.error("Error al obtener las alertas desde Edge Functions:", error);
     throw error;
   }
 };
@@ -43,8 +48,10 @@ export const getAlerts = async (forceRefresh = false) => {
 
     if (!adapter) {
       // Fallback: llamada directa si no hay cache disponible
-      console.warn("Cache no disponible, ejecutando llamada directa");
-      return await fetchAlertsFromServer();
+      console.warn(
+        "Cache no disponible, ejecutando llamada directa a Edge Functions"
+      );
+      return await fetchAlertsFromEdgeFunction();
     }
 
     // Si hay una petición pendiente y no es force refresh, esperar a que termine
@@ -56,7 +63,7 @@ export const getAlerts = async (forceRefresh = false) => {
     const requestPromise = adapter.withCache(
       "getAlerts",
       "all",
-      fetchAlertsFromServer,
+      fetchAlertsFromEdgeFunction,
       forceRefresh ? { skipCache: true } : {}
     );
 
@@ -72,7 +79,10 @@ export const getAlerts = async (forceRefresh = false) => {
   } catch (error) {
     // Limpiar petición pendiente en caso de error
     pendingRequest = null;
-    console.error("[ALERTS_SERVICE]  Error al obtener alertas:", error);
+    console.error(
+      "[ALERTS_SERVICE] Error al obtener alertas desde Edge Functions:",
+      error
+    );
     throw error;
   }
 };
@@ -84,9 +94,15 @@ export const getAlerts = async (forceRefresh = false) => {
  */
 export const getAlertById = async (id) => {
   try {
-    return await httpFetch(alertsEndpoint.byId(id));
+    const result = await EdgeFunctions.alerts.getById(id);
+
+    if (result.success) {
+      return result.data;
+    } else {
+      throw new Error(result.error || "Error obteniendo alerta");
+    }
   } catch (error) {
-    console.error("Error al obtener la alerta:", error);
+    console.error("Error al obtener la alerta desde Edge Functions:", error);
     throw error;
   }
 };
@@ -98,18 +114,21 @@ export const getAlertById = async (id) => {
  */
 export const createAlert = async (alertData) => {
   try {
-    // Crear alerta en servidor
-    const newAlert = await httpFetch(alertsEndpoint.base(), {
-      method: "POST",
-      body: alertData,
-    });
+    // Crear alerta usando Edge Functions
+    const result = await EdgeFunctions.alerts.create(alertData);
+
+    if (!result.success) {
+      throw new Error(result.error || "Error creando alerta");
+    }
+
+    const newAlert = result.data;
 
     // Actualización optimista del caché
     await updateCacheAfterMutation();
 
     return newAlert;
   } catch (error) {
-    console.error("Error al crear la alerta:", error);
+    console.error("Error al crear la alerta con Edge Functions:", error);
     throw error;
   }
 };
@@ -122,18 +141,21 @@ export const createAlert = async (alertData) => {
  */
 export const updateAlert = async (id, alertData) => {
   try {
-    // Actualizar en servidor
-    const updatedAlert = await httpFetch(alertsEndpoint.byId(id), {
-      method: "PUT",
-      body: alertData,
-    });
+    // Actualizar usando Edge Functions
+    const result = await EdgeFunctions.alerts.update(id, alertData);
+
+    if (!result.success) {
+      throw new Error(result.error || "Error actualizando alerta");
+    }
+
+    const updatedAlert = result.data;
 
     // Actualización optimista del caché
     await updateCacheAfterMutation();
 
     return updatedAlert;
   } catch (error) {
-    console.error("Error al actualizar la alerta:", error);
+    console.error("Error al actualizar la alerta con Edge Functions:", error);
     throw error;
   }
 };
@@ -145,17 +167,19 @@ export const updateAlert = async (id, alertData) => {
  */
 export const deleteAlert = async (id) => {
   try {
-    // Eliminar del servidor
-    const result = await httpFetch(alertsEndpoint.byId(id), {
-      method: "DELETE",
-    });
+    // Eliminar usando Edge Functions
+    const result = await EdgeFunctions.alerts.delete(id);
+
+    if (!result.success) {
+      throw new Error(result.error || "Error eliminando alerta");
+    }
 
     // Actualización optimista del caché
     await updateCacheAfterMutation();
 
-    return result;
+    return result.data;
   } catch (error) {
-    console.error("Error al eliminar la alerta:", error);
+    console.error("Error al eliminar la alerta con Edge Functions:", error);
     throw error;
   }
 };

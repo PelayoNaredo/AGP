@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
 import { Platform } from "react-native";
 import { DefaultTheme, Provider as PaperProvider } from "react-native-paper";
-import { Services } from "../api/index";
+import Services from "../api/index";
 
 // Paleta de colores profesional
 const colors = {

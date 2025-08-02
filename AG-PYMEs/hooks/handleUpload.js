@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { DocumentPicker } from "@react-native-picker/picker";
-import { Services } from "../api/index";
-import { NGROK_HOST } from "@env";
+import { Services } from "../api";
 import useNotifications from "./useNotifications";
 
 const useFileUpload = (config = {}) => {
@@ -92,20 +91,27 @@ const useFileUpload = (config = {}) => {
         }
       };
 
-      const baseUrl = NGROK_HOST || "http://localhost:3001";
-      const url = finalConfig.endpoint.startsWith("http")
-        ? finalConfig.endpoint
-        : `${baseUrl}${finalConfig.endpoint}`;
+      // Usar Supabase File Service en lugar del backend legacy
+      try {
+        const result = await Services.File.uploadFile(
+          file,
+          finalConfig.path || "",
+          {
+            compress: finalConfig.compress || false,
+            overwrite: finalConfig.overwrite || false,
+          }
+        );
 
-      xhr.open(finalConfig.method, url);
-
-      // Configurar headers
-      const headers = await getHeaders();
-      Object.entries(headers).forEach(([key, value]) => {
-        xhr.setRequestHeader(key, value);
-      });
-
-      xhr.send(formData);
+        setUploadProgress(100);
+        resolve({
+          fileName: result.fileName,
+          filePath: result.path,
+          url: result.url,
+          success: true,
+        });
+      } catch (error) {
+        reject(error);
+      }
     });
   };
 

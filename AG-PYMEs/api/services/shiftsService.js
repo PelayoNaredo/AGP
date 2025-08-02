@@ -1,10 +1,12 @@
-import { httpFetch } from "../http";
-import { shiftsEndpoint } from "../endpoints";
+import { EdgeFunctions } from "../../config/supabase";
 
 export const getAllShifts = async () => {
   try {
-    const shifts = await httpFetch(shiftsEndpoint.base());
-    return transformShiftsResponse(shifts);
+    const result = await EdgeFunctions.shifts.getAll();
+    if (result.success) {
+      return transformShiftsResponse(result.data);
+    }
+    throw new Error(result.error || "Error al obtener turnos");
   } catch (error) {
     console.error("Error en getAllShifts:", error);
     throw error;
@@ -13,8 +15,11 @@ export const getAllShifts = async () => {
 
 export const getShiftById = async (id) => {
   try {
-    const shift = await httpFetch(shiftsEndpoint.byId(id));
-    return transformShiftResponse(shift);
+    const result = await EdgeFunctions.shifts.getById(id);
+    if (result.success) {
+      return transformShiftResponse(result.data);
+    }
+    throw new Error(result.error || "Error al obtener turno");
   } catch (error) {
     console.error("Error en getShiftById:", error);
     throw error;
@@ -23,9 +28,11 @@ export const getShiftById = async (id) => {
 
 export const getShiftByDate = async (fecha_inicio_semana) => {
   try {
-    const endpoint = shiftsEndpoint.byDate(fecha_inicio_semana);
-    const shifts = await httpFetch(endpoint);
-    return shifts;
+    const result = await EdgeFunctions.shifts.getByDate(fecha_inicio_semana);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener turnos por fecha");
   } catch (error) {
     console.error("Error getting shifts:", error.message);
     throw error;
@@ -35,9 +42,11 @@ export const getShiftByDate = async (fecha_inicio_semana) => {
 // Método optimizado para cache mensual
 export const getShiftsByMonth = async (year, month) => {
   try {
-    const endpoint = shiftsEndpoint.byMonth(year, month);
-    const monthlyData = await httpFetch(endpoint);
-    return monthlyData;
+    const result = await EdgeFunctions.shifts.getByMonth(year, month);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener turnos mensuales");
   } catch (error) {
     console.error("Error getting monthly shifts:", error.message);
     throw error;
@@ -48,26 +57,14 @@ export const getShiftsByMonth = async (year, month) => {
 // Útil para exportar o enviar por correo
 export const getShiftsWithEmployeeInfo = async (fecha_inicio_semana) => {
   try {
-    // Obtener horarios y empleados
-    const [shifts, employees] = await Promise.all([
-      getShiftByDate(fecha_inicio_semana),
-      httpFetch("/api/employees"),
-    ]);
-
-    if (!shifts || shifts.length === 0) {
-      return [];
+    const result =
+      await EdgeFunctions.shifts.getWithEmployeeInfo(fecha_inicio_semana);
+    if (result.success) {
+      return result.data;
     }
-
-    // Combinar la información de horarios con los datos de los empleados
-    return shifts.map((shift) => {
-      const employee = employees.find(
-        (e) => e.id_empleado === shift.id_empleado
-      );
-      return {
-        ...shift,
-        employee: employee || null,
-      };
-    });
+    throw new Error(
+      result.error || "Error al obtener turnos con info de empleados"
+    );
   } catch (error) {
     console.error("Error en getShiftsWithEmployeeInfo:", error);
     throw error;
@@ -77,17 +74,14 @@ export const getShiftsWithEmployeeInfo = async (fecha_inicio_semana) => {
 // Función para obtener los horarios mensuales para exportación
 export const getMonthlyShiftsForExport = async (fecha_inicio_mes) => {
   try {
-    // Endpoint específico para exportación que ya devuelve los datos procesados
-    const shiftsWithEmployeeInfo = await httpFetch(
-      shiftsEndpoint.exportMonth(fecha_inicio_mes)
-    );
-
-    if (!shiftsWithEmployeeInfo || shiftsWithEmployeeInfo.length === 0) {
-      return [];
+    const result =
+      await EdgeFunctions.shifts.getMonthlyForExport(fecha_inicio_mes);
+    if (result.success) {
+      return result.data;
     }
-
-    // Los datos ya vienen con toda la información necesaria desde el backend
-    return shiftsWithEmployeeInfo;
+    throw new Error(
+      result.error || "Error al obtener turnos mensuales para exportación"
+    );
   } catch (error) {
     console.error("Error en getMonthlyShiftsForExport:", error);
     throw error;
@@ -101,35 +95,17 @@ export const saveShift = async (
   intervalos
 ) => {
   try {
-    // Primero guardamos o actualizamos el turno base
-    const shiftResponse = await httpFetch(shiftsEndpoint.save(), {
-      method: "POST",
-      body: {
-        id_empleado,
-        fecha_inicio_semana,
-        updates: {
-          [`h${dia_semana}_entrada`]: intervalos[0]?.hora_inicio || null,
-          [`h${dia_semana}_salida`]: intervalos[0]?.hora_fin || null,
-        },
-      },
+    const result = await EdgeFunctions.shifts.save({
+      id_empleado,
+      fecha_inicio_semana,
+      dia_semana,
+      intervalos,
     });
 
-    // Luego guardamos los intervalos
-    if (intervalos && intervalos.length > 0) {
-      const promises = intervalos.map((intervalo) =>
-        httpFetch(shiftsEndpoint.intervals.add(shiftResponse.id_horario), {
-          method: "POST",
-          body: {
-            dia_semana,
-            hora_entrada: intervalo.hora_inicio,
-            hora_salida: intervalo.hora_fin,
-          },
-        })
-      );
-      await Promise.all(promises);
+    if (result.success) {
+      return result.data;
     }
-
-    return await getShiftById(shiftResponse.id_horario);
+    throw new Error(result.error || "Error al guardar turno");
   } catch (error) {
     console.error("Error en saveShift:", error);
     throw error;
@@ -138,9 +114,11 @@ export const saveShift = async (
 
 export const deleteShift = async (id) => {
   try {
-    return await httpFetch(shiftsEndpoint.byId(id), {
-      method: "DELETE",
-    });
+    const result = await EdgeFunctions.shifts.delete(id);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al eliminar turno");
   } catch (error) {
     console.error("Error en deleteShift:", error);
     throw error;
@@ -149,12 +127,14 @@ export const deleteShift = async (id) => {
 
 export const deleteShiftInterval = async (shiftId, intervalId) => {
   try {
-    return await httpFetch(
-      shiftsEndpoint.intervals.delete(shiftId, intervalId),
-      {
-        method: "DELETE",
-      }
+    const result = await EdgeFunctions.shifts.deleteInterval(
+      shiftId,
+      intervalId
     );
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al eliminar intervalo de turno");
   } catch (error) {
     console.error("Error en deleteShiftInterval:", error);
     throw error;
@@ -164,16 +144,21 @@ export const deleteShiftInterval = async (shiftId, intervalId) => {
 // Función para copiar horarios de una semana a otra
 export const copyShiftsFromPreviousWeek = async (sourceWeek, targetWeek) => {
   try {
-    const result = await httpFetch(
-      shiftsEndpoint.copy(sourceWeek, targetWeek),
-      {
-        method: "POST",
-      }
+    const result = await EdgeFunctions.shifts.copyFromPreviousWeek(
+      sourceWeek,
+      targetWeek
     );
 
+    if (result.success) {
+      return {
+        success: true,
+        data: result.data || { numShifts: 0 },
+      };
+    }
+
     return {
-      success: true,
-      data: result || { numShifts: 0 },
+      success: false,
+      error: result.error || "Error al copiar turnos",
     };
   } catch (error) {
     console.error("Error en copyShiftsFromPreviousWeek:", error);

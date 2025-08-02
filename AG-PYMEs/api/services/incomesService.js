@@ -1,12 +1,12 @@
-import { httpFetch } from "../http";
-import { incomesEndpoint } from "../endpoints";
+import { EdgeFunctions } from "../../config/supabase";
 
 export const getIncomes = async (page = 1, pageSize = 20) => {
   try {
-    const endpoint = `${incomesEndpoint.base()}?page=${page}&pageSize=${pageSize}`;
-    const response = await httpFetch(endpoint);
-
-    return response;
+    const result = await EdgeFunctions.income.getAll();
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener los ingresos");
   } catch (error) {
     console.error("[IncomesService] Error al obtener los ingresos:", error);
     console.error("[IncomesService] Mensaje:", error.message);
@@ -17,7 +17,11 @@ export const getIncomes = async (page = 1, pageSize = 20) => {
 
 export const getIncomeById = async (id) => {
   try {
-    return await httpFetch(incomesEndpoint.byId(id));
+    const result = await EdgeFunctions.income.getById(id);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener el ingreso");
   } catch (error) {
     console.error(`[IncomesService] Error al obtener el ingreso ${id}:`, error);
     throw error;
@@ -26,11 +30,11 @@ export const getIncomeById = async (id) => {
 
 export const createIncome = async (incomeData) => {
   try {
-    const response = await httpFetch(incomesEndpoint.base(), {
-      method: "POST",
-      body: incomeData,
-    });
-    return response;
+    const result = await EdgeFunctions.income.create(incomeData);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al crear el ingreso");
   } catch (error) {
     console.error("[IncomesService] Error al crear el ingreso:", error);
     throw error;
@@ -39,11 +43,11 @@ export const createIncome = async (incomeData) => {
 
 export const updateIncome = async (id, incomeData) => {
   try {
-    const response = await httpFetch(incomesEndpoint.byId(id), {
-      method: "PUT",
-      body: incomeData,
-    });
-    return response;
+    const result = await EdgeFunctions.income.update(id, incomeData);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al actualizar el ingreso");
   } catch (error) {
     console.error(
       `[IncomesService] Error al actualizar el ingreso ${id}:`,
@@ -55,9 +59,11 @@ export const updateIncome = async (id, incomeData) => {
 
 export const deleteIncome = async (id) => {
   try {
-    return await httpFetch(incomesEndpoint.byId(id), {
-      method: "DELETE",
-    });
+    const result = await EdgeFunctions.income.delete(id);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al eliminar el ingreso");
   } catch (error) {
     console.error(
       `[IncomesService] Error al eliminar el ingreso ${id}:`,

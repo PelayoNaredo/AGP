@@ -14,6 +14,7 @@ import ClientModal from "./ClientModal";
 import ClientInfoComponent from "./ClientInfoComponent";
 import SearchHeaderBar from "../../../components/searchHeaderBar";
 import useNotifications from "../../../hooks/useNotifications";
+import useCompanyLimits from "../../../hooks/useCompanyLimits";
 import ModalTemplate from "../../../components/modalTemplate";
 import PopupMenu, {
   MenuItem,
@@ -26,6 +27,7 @@ const ClientsScreen = forwardRef(
   ({ hideSearchBar = false, externalSearchQuery = "" }, ref) => {
     const { themeObject } = useTheme();
     const { showError, showSuccess, showConfirmDialog } = useNotifications();
+    const { canAddClient } = useCompanyLimits();
     const [clients, setClients] = useState([]);
     const [filteredClients, setFilteredClients] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -107,7 +109,13 @@ const ClientsScreen = forwardRef(
     };
 
     // Funciones para manejar acciones de cliente
-    const handleAddClient = () => {
+    const handleAddClient = async () => {
+      // Verificar límites antes de añadir cliente
+      const canAdd = await canAddClient();
+      if (!canAdd) {
+        return; // El hook ya muestra el error
+      }
+
       setSelectedClient(null);
       setShowNewClientForm(true);
       setIsModalVisible(true);

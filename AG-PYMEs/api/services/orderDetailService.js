@@ -1,9 +1,14 @@
-import { httpFetch } from "../http";
-import { orderDetailsEndpoint } from "../endpoints";
+import { EdgeFunctions } from "../../config/supabase";
 
 export const getAllOrderDetails = async () => {
   try {
-    return await httpFetch(orderDetailsEndpoint.base());
+    const result = await EdgeFunctions.orderDetails.getAll();
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(
+      result.error || "Error al obtener los detalles de la orden"
+    );
   } catch (error) {
     console.error("Error al obtener los detalles de la orden:", error);
     throw error;
@@ -12,7 +17,11 @@ export const getAllOrderDetails = async () => {
 
 export const getOrderDetailById = async (id) => {
   try {
-    return await httpFetch(orderDetailsEndpoint.byId(id));
+    const result = await EdgeFunctions.orderDetails.getById(id);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener el detalle de la orden");
   } catch (error) {
     console.error("Error al obtener el detalle de la orden:", error);
     throw error;
@@ -21,10 +30,11 @@ export const getOrderDetailById = async (id) => {
 
 export const createOrderDetail = async (orderDetailData) => {
   try {
-    return await httpFetch(orderDetailsEndpoint.base(), {
-      method: "POST",
-      body: orderDetailData,
-    });
+    const result = await EdgeFunctions.orderDetails.create(orderDetailData);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al crear el detalle de la orden");
   } catch (error) {
     console.error("Error al crear el detalle de la orden:", error);
     throw error;
@@ -33,10 +43,13 @@ export const createOrderDetail = async (orderDetailData) => {
 
 export const updateOrderDetail = async (id, orderDetailData) => {
   try {
-    return await httpFetch(orderDetailsEndpoint.byId(id), {
-      method: "PUT",
-      body: orderDetailData,
-    });
+    const result = await EdgeFunctions.orderDetails.update(id, orderDetailData);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(
+      result.error || "Error al actualizar el detalle de la orden"
+    );
   } catch (error) {
     console.error("Error al actualizar el detalle de la orden:", error);
     throw error;
@@ -45,9 +58,11 @@ export const updateOrderDetail = async (id, orderDetailData) => {
 
 export const deleteOrderDetail = async (id) => {
   try {
-    return await httpFetch(orderDetailsEndpoint.byId(id), {
-      method: "DELETE",
-    });
+    const result = await EdgeFunctions.orderDetails.delete(id);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al eliminar el detalle de la orden");
   } catch (error) {
     console.error("Error al eliminar el detalle de la orden:", error);
     throw error;

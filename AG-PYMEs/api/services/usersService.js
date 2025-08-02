@@ -1,12 +1,12 @@
-import { httpFetch } from "../http";
-import { usersEndpoint } from "../endpoints";
+import { EdgeFunctions } from "../../config/supabase";
 
 export const createUser = async (userData) => {
   try {
-    return await httpFetch(usersEndpoint.base(), {
-      method: "POST",
-      body: userData,
-    });
+    const result = await EdgeFunctions.users.create(userData);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al crear el usuario");
   } catch (error) {
     console.error("Error al crear el usuario:", error);
     throw error;

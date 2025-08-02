@@ -1,9 +1,12 @@
-import { httpFetch } from "../http";
-import { expensesEndpoint } from "../endpoints";
+import { EdgeFunctions } from "../../config/supabase";
 
 export const getExpenses = async () => {
   try {
-    return await httpFetch(expensesEndpoint.base());
+    const result = await EdgeFunctions.expenses.getAll();
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener los gastos");
   } catch (error) {
     console.error("Error al obtener los gastos:", error);
     throw error;
@@ -12,7 +15,11 @@ export const getExpenses = async () => {
 
 export const getExpenseById = async (id) => {
   try {
-    return await httpFetch(expensesEndpoint.byId(id));
+    const result = await EdgeFunctions.expenses.getById(id);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener el gasto");
   } catch (error) {
     console.error("Error al obtener el gasto:", error);
     throw error;
@@ -21,10 +28,11 @@ export const getExpenseById = async (id) => {
 
 export const createExpense = async (expenseData) => {
   try {
-    return await httpFetch(expensesEndpoint.base(), {
-      method: "POST",
-      body: expenseData,
-    });
+    const result = await EdgeFunctions.expenses.create(expenseData);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al crear el gasto");
   } catch (error) {
     console.error("Error al crear el gasto:", error);
     throw error;
@@ -33,10 +41,11 @@ export const createExpense = async (expenseData) => {
 
 export const updateExpense = async (id, expenseData) => {
   try {
-    return await httpFetch(expensesEndpoint.byId(id), {
-      method: "PUT",
-      body: expenseData,
-    });
+    const result = await EdgeFunctions.expenses.update(id, expenseData);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al actualizar el gasto");
   } catch (error) {
     console.error("Error al actualizar el gasto:", error);
     throw error;
@@ -45,9 +54,11 @@ export const updateExpense = async (id, expenseData) => {
 
 export const deleteExpense = async (id) => {
   try {
-    return await httpFetch(expensesEndpoint.byId(id), {
-      method: "DELETE",
-    });
+    const result = await EdgeFunctions.expenses.delete(id);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al eliminar el gasto");
   } catch (error) {
     console.error("Error al eliminar el gasto:", error);
     throw error;
@@ -60,9 +71,14 @@ export const getExpensesPaginated = async (
   search = ""
 ) => {
   try {
-    return await httpFetch(
-      `${expensesEndpoint.base()}?page=${page}&limit=${itemsPerPage}&search=${search}`
+    const result = await EdgeFunctions.expenses.getPaginated(
+      page,
+      itemsPerPage
     );
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener los gastos paginados");
   } catch (error) {
     console.error("Error al obtener los gastos paginados:", error);
     throw error;
@@ -71,9 +87,11 @@ export const getExpensesPaginated = async (
 
 export const getExpensesByMonth = async (month, year, search = "") => {
   try {
-    return await httpFetch(
-      `${expensesEndpoint.base()}/month?month=${month}&year=${year}&search=${search}`
-    );
+    const result = await EdgeFunctions.expenses.getByMonth(year, month);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener los gastos del mes");
   } catch (error) {
     console.error("Error al obtener los gastos del mes:", error);
     throw error;

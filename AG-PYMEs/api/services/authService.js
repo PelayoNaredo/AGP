@@ -1,37 +1,60 @@
-import { httpFetch } from "../../api/http";
-import { authEndpoint } from "../../api/endpoints";
+import { supabase } from "../../config/supabase";
 import TokenStorage from "./storage/tokenStorage";
 
-//Servicio de autenticación centralizado
+//Servicio de autenticación centralizado usando Supabase Auth
 
 //Obtiene el token de autenticación actual
 export const getAuthToken = async () => {
   try {
-    const token = await TokenStorage.getToken();
-    return token;
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const token = session?.access_token;
+
+    if (token) {
+      // Mantener sincronizado con TokenStorage para compatibilidad
+      await TokenStorage.saveToken(token);
+      return token;
+    }
+
+    // Fallback a TokenStorage si no hay sesión de Supabase
+    return await TokenStorage.getToken();
   } catch (error) {
     console.error("[AuthService] Error al obtener el token:", error);
     return null;
   }
 };
 
-//Autentica al usuario con sus credenciales
+//Autentica al usuario con sus credenciales usando Supabase Auth
 export const login = async (credentials) => {
   try {
-    const data = await httpFetch(authEndpoint.login(), {
-      method: "POST",
-      body: credentials,
+    const { email, password } = credentials;
+
+    // Usar Supabase Auth para login
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
 
-    // Verificar que se recibió un token válido
-    if (!data.token) {
+    if (error) {
+      console.error("[AuthService] Error en el login:", error);
+      throw new Error(error.message);
+    }
+
+    // Verificar que se recibió una sesión válida
+    if (!data.session?.access_token) {
       console.error("[AuthService] Error en el login: No se recibió token.");
       throw new Error("No token received");
     }
 
-    // Almacenar token en storage y caché
-    await TokenStorage.saveToken(data.token);
-    return data;
+    // Almacenar token en storage para compatibilidad
+    await TokenStorage.saveToken(data.session.access_token);
+
+    return {
+      token: data.session.access_token,
+      user: data.user,
+      session: data.session,
+    };
   } catch (err) {
     console.error("[AuthService] Error durante el login:", err);
     // Limpiar token en caso de error
@@ -40,16 +63,27 @@ export const login = async (credentials) => {
   }
 };
 
-//Verifica si el usuario está autenticado
-
+//Verifica si el usuario está autenticado usando Supabase Auth
 export const checkAuth = async () => {
   try {
-    const token = await TokenStorage.getToken();
-    if (!token) return null;
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
 
-    // Verificar token con el backend
-    const data = await httpFetch(authEndpoint.verifyToken());
-    return data.user || null;
+    if (error) {
+      console.error("[AuthService] Error en checkAuth:", error);
+      await TokenStorage.removeToken();
+      return null;
+    }
+
+    if (session?.user) {
+      // Mantener token sincronizado
+      await TokenStorage.saveToken(session.access_token);
+      return session.user;
+    }
+
+    return null;
   } catch (err) {
     console.error("[AuthService] Error en checkAuth:", err);
     // Limpiar token en caso de error de autenticación
@@ -58,21 +92,14 @@ export const checkAuth = async () => {
   }
 };
 
-//Cierra la sesión del usuario
-
+//Cierra la sesión del usuario usando Supabase Auth
 export const logoutUser = async () => {
   try {
-    // Primero intentamos hacer logout en el servidor si hay endpoint para ello
-    const token = await TokenStorage.getToken();
-    if (token && authEndpoint.logout) {
-      try {
-        await httpFetch(authEndpoint.logout(), {
-          method: "POST",
-        });
-      } catch (logoutErr) {
-        // Si falla el logout en servidor, seguimos con el proceso local
-        console.warn("[AuthService] Error en logout del servidor:", logoutErr);
-      }
+    // Hacer logout en Supabase
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      console.warn("[AuthService] Error en logout de Supabase:", error);
     }
 
     // Eliminamos el token localmente
@@ -83,27 +110,41 @@ export const logoutUser = async () => {
   }
 };
 
-//Actualiza el token si el backend proporciona refresh
+//Función de refreshToken usando Supabase Auth
 export const refreshToken = async () => {
   try {
-    const token = await TokenStorage.getToken();
-    if (!token) return false;
+    // Intentar refrescar la sesión en Supabase
+    const { data, error } = await supabase.auth.refreshSession();
 
-    // Solo si existe un endpoint de refresh
-    if (authEndpoint.refreshToken) {
-      const data = await httpFetch(authEndpoint.refreshToken(), {
-        method: "POST",
-      });
+    if (error) {
+      console.warn(
+        "[AuthService] Error al refrescar token en Supabase:",
+        error
+      );
 
-      if (data.token) {
-        await TokenStorage.saveToken(data.token);
-        return true;
+      // Si falla, intentar obtener la sesión actual
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+
+      if (sessionError || !sessionData.session) {
+        await TokenStorage.removeToken();
+        return false;
       }
+
+      await TokenStorage.saveToken(sessionData.session.access_token);
+      return true;
+    }
+
+    if (data.session?.access_token) {
+      // Actualizar el token en storage local
+      await TokenStorage.saveToken(data.session.access_token);
+      return true;
     }
 
     return false;
   } catch (error) {
-    console.error("[AuthService] Error actualizando token:", error);
+    console.error("[AuthService] Error en refreshToken:", error);
+    await TokenStorage.removeToken();
     return false;
   }
 };

@@ -1,5 +1,4 @@
-import { settingsEndpoint } from "../endpoints";
-import { httpFetch } from "../http";
+import { EdgeFunctions } from "../../config/supabase";
 import TokenStorage from "./storage/tokenStorage";
 
 export const getSettingById = async (id) => {
@@ -11,9 +10,11 @@ export const getSettingById = async (id) => {
       throw new Error("No hay token disponible");
     }
 
-    const response = await httpFetch(settingsEndpoint.byId(id));
-
-    return response;
+    const result = await EdgeFunctions.settings.getById(id);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener configuración");
   } catch (error) {
     console.error("[Settings] Error en getSettingById:", {
       error: error.message,
@@ -25,10 +26,11 @@ export const getSettingById = async (id) => {
 
 export const createSetting = async (settingData) => {
   try {
-    return await httpFetch(settingsEndpoint.base(), {
-      method: "POST",
-      body: settingData,
-    });
+    const result = await EdgeFunctions.settings.create(settingData);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al crear el ajuste");
   } catch (error) {
     console.error("Error al crear el ajuste:", error);
     throw error;
@@ -46,12 +48,11 @@ export const updateSetting = async (id, data) => {
       throw new Error("No hay token disponible");
     }
 
-    const response = await httpFetch(settingsEndpoint.byId(id), {
-      method: "PUT",
-      body: data,
-    });
-
-    return response;
+    const result = await EdgeFunctions.settings.update(id, data);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al actualizar configuración");
   } catch (error) {
     console.error("[Settings] Error en updateSettings:", {
       error: error.message,

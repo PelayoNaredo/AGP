@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useTheme } from "../../../context/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
-import { http } from "../../../api/http";
+import { Services } from "../../../api";
 import BarcodeScanner from "../../../components/BarcodeScanner";
 
 // Componente ProductSelector para seleccionar productos en el punto de venta
@@ -155,7 +155,8 @@ const ProductSelector = ({ onSelectProduct }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await http.get("/api/inventory");
+      // Usar Edge Functions de Supabase en lugar del backend legacy
+      const response = await Services.Data.Inventory.getAll();
       setProducts(response);
       setFilteredProducts(response);
     } catch (err) {

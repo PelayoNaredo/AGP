@@ -5,13 +5,13 @@ import {
   updateEmployee,
   createEmployee,
   deleteEmployee,
-} from "../../api/services/employeesService";
+} from "../../api";
 import {
   getLeaves,
   createLeave,
   // updateLeave, // CÓDIGO MUERTO: No se usa en este hook
   // deleteLeave, // CÓDIGO MUERTO: No se usa en este hook
-} from "../../api/services/leavesService";
+} from "../../api";
 
 const useEmployeeManagement = () => {
   // Estados principales

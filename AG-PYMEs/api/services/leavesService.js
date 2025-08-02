@@ -1,11 +1,12 @@
-import { httpFetch } from "../http";
-import { leavesEndpoint } from "../endpoints";
+import { EdgeFunctions } from "../../config/supabase";
 
 export const getLeaves = async () => {
   try {
-    const response = await httpFetch(leavesEndpoint.base());
-    if (!response) return [];
-    return Array.isArray(response) ? response : [];
+    const result = await EdgeFunctions.leaves.getAll();
+    if (result.success) {
+      return Array.isArray(result.data) ? result.data : [];
+    }
+    return [];
   } catch (error) {
     console.error("Error al obtener las bajas:", error);
     return [];
@@ -14,7 +15,11 @@ export const getLeaves = async () => {
 
 export const getLeaveById = async (id) => {
   try {
-    return await httpFetch(leavesEndpoint.byId(id));
+    const result = await EdgeFunctions.leaves.getById(id);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al obtener la baja");
   } catch (error) {
     console.error("Error al obtener la baja:", error);
     throw error;
@@ -23,12 +28,11 @@ export const getLeaveById = async (id) => {
 
 export const createLeave = async (leaveData) => {
   try {
-    // No hacer JSON.stringify aquí, httpFetch lo hará
-    const response = await httpFetch(leavesEndpoint.base(), {
-      method: "POST",
-      body: leaveData,
-    });
-    return response;
+    const result = await EdgeFunctions.leaves.create(leaveData);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al crear la baja");
   } catch (error) {
     console.error("Error al crear la baja:", error);
     throw new Error("No se pudo crear la baja");
@@ -53,12 +57,11 @@ export const updateLeave = async (id, leaveData) => {
         : null,
     };
 
-    const response = await httpFetch(leavesEndpoint.byId(id), {
-      method: "PUT",
-      body: formattedData, // No hacer JSON.stringify aquí
-    });
-
-    return response;
+    const result = await EdgeFunctions.leaves.update(id, formattedData);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al actualizar la baja");
   } catch (error) {
     console.error("Error al actualizar la baja:", error);
     throw new Error(error.message || "No se pudo actualizar la baja");
@@ -67,9 +70,11 @@ export const updateLeave = async (id, leaveData) => {
 
 export const deleteLeave = async (id) => {
   try {
-    return await httpFetch(leavesEndpoint.byId(id), {
-      method: "DELETE",
-    });
+    const result = await EdgeFunctions.leaves.delete(id);
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error || "Error al eliminar la baja");
   } catch (error) {
     console.error("Error al eliminar la baja:", error);
     throw error;

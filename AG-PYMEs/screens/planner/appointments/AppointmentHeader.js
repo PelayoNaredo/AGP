@@ -92,7 +92,7 @@ const AppointmentHeader = ({
     <View
       style={[
         styles.container,
-        { backgroundColor: themeObject.colors.surface },
+        { backgroundColor: themeObject.colors.background },
       ]}
     >
       <View style={styles.titleContainer}>
@@ -240,8 +240,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === "ios" ? 16 : 12,
     paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
     marginBottom: 8,
   },
   titleContainer: {

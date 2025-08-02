@@ -12,7 +12,7 @@ import CustomButton from "../../../components/customButton";
 import ModalTemplate from "../../../components/modalTemplate";
 import { useTheme } from "../../../context/ThemeContext";
 import { Services } from "../../../api";
-import { NGROK_HOST } from "@env";
+import { Services as FileServices } from "../../../api";
 import useNotifications from "../../../hooks/useNotifications";
 import PopupMenu, { MenuItem } from "../../../components/popupMenu";
 
@@ -86,10 +86,8 @@ const EmployeeCard = ({ employee, onEdit, onDelete }) => {
             filenamePart = fileUrl;
           }
 
-          // Construir la URL para descargar directamente
-          const baseUrl = NGROK_HOST || "http://localhost:3001";
-          const timestamp = Date.now(); // Evitar caché          // Usar endpoint que funciona correctamente y abrir en nueva pestaña
-          const downloadUrl = `${baseUrl}/api/media/${filenamePart}?t=${timestamp}&download=true&token=${token}`;
+          // Usar el servicio de archivos de Supabase para obtener URL normalizada
+          const downloadUrl = FileServices.File.normalizeImageUrl(filenamePart);
           window.open(downloadUrl, "_blank");
 
           // Mostrar notificación de éxito
@@ -112,10 +110,9 @@ const EmployeeCard = ({ employee, onEdit, onDelete }) => {
             filenamePart = fileUrl;
           }
 
-          // Construir URL para abrir en el navegador
-          const baseUrl = NGROK_HOST || "http://localhost:3001";
-          const timestamp = Date.now();
-          const finalUrl = `${baseUrl}/api/media/${filenamePart}?t=${timestamp}&download=true&token=${token}`; // Abrir en el navegador del dispositivo
+          // Usar el servicio de archivos de Supabase para obtener URL normalizada
+          const finalUrl = FileServices.File.normalizeImageUrl(filenamePart);
+          // Abrir en el navegador del dispositivo
           Linking.openURL(finalUrl);
 
           // Mostrar notificación de éxito

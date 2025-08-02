@@ -2,9 +2,8 @@ import { useState, useEffect } from "react";
 import { useTheme } from "../context/ThemeContext";
 import { useUnifiedCache } from "../cache/hooks/useUnifiedCache";
 import { Platform, Alert } from "react-native";
-import { Services } from "../api/index";
+import { Services } from "../api";
 import useNotifications from "./useNotifications";
-import { BaseStorage } from "../api/services/storage";
 
 const useSettingsWithCache = () => {
   const { theme, toggleTheme } = useTheme();
@@ -45,7 +44,7 @@ const useSettingsWithCache = () => {
 
       if (setting) {
         // Obtener tema actual del localStorage para preservarlo
-        const currentTheme = await BaseStorage.getItem("appTheme");
+        const currentTheme = await Services.Storage.Base.getItem("appTheme");
 
         const newSettings = {
           ...setting,

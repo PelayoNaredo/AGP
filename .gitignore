@@ -1,2 +1,14 @@
 node_modules
 .env
+
+# Documentos con información sensible (API keys, credenciales)
+docs/Migracion_Supabase.md
+
+# Archivos de migración con credenciales
+scripts/users-export.json
+scripts/migration-results.json
+**/migration-*.json
+
+# Logs de migración
+migration-*.log
+supabase-*.log

@@ -10,13 +10,13 @@ import {
 } from "react-native-paper";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import { http } from "../../../api/http";
 import { formatCurrency, formatDateTime } from "../../../utils/helpers";
 import useNotifications from "../../../hooks/useNotifications";
 import CustomPicker from "../../../components/customPicker";
 import DailySalesHeader from "./DailySalesHeader";
 import DailyClosureModal from "./DailyClosureModal";
 import SaleModal from "../salesPoint/SaleModal";
+import { Services } from "../../../api";
 import {
   executeDailyClosure,
   checkDailyClosure as checkDailyClosureService,
@@ -112,7 +112,8 @@ const SalesHistoryScreen = () => {
       const day = String(date.getDate()).padStart(2, "0");
       const formattedDate = `${year}-${month}-${day}`;
 
-      const response = await http.get(`/api/sales/date/${formattedDate}`);
+      // Usar Edge Functions de Supabase en lugar del backend legacy
+      const response = await Services.Data.Sales.getByDate(formattedDate);
       const salesData = Array.isArray(response) ? response : [];
 
       setSales(salesData);

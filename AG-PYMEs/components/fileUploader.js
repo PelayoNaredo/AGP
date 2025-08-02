@@ -15,7 +15,6 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
 import ModalTemplate from "./modalTemplate";
 import { Services, Components } from "../api";
-import { NGROK_HOST } from "@env";
 import useNotifications from "../hooks/useNotifications";
 
 const { ImageWithAuth } = Components;
@@ -299,13 +298,8 @@ const FileUploader = ({
             filenamePart = fileUrl;
           }
 
-          // Construir la URL para descargar directamente
-          const baseUrl = NGROK_HOST || "http://localhost:3001";
-          const timestamp = Date.now(); // Evitar caché
-
-          // Usar solo el endpoint que sabemos que funciona correctamente
-          // Directamente abrir una nueva pestaña del navegador con la URL
-          const downloadUrl = `${baseUrl}/api/media/${filenamePart}?t=${timestamp}&download=true&token=${token}`;
+          // Usar el servicio de archivos de Supabase para obtener URL normalizada
+          const downloadUrl = Services.File.normalizeImageUrl(filenamePart);
           window.open(downloadUrl, "_blank");
         } catch (error) {
           console.error("[FileUploader] Error en descarga web:", error);
@@ -364,20 +358,18 @@ const FileUploader = ({
           filenamePart = fileName;
         }
 
-        // Construir una URL directa y simple
-        const baseUrl = NGROK_HOST || "http://localhost:3001";
-        const downloadUrl = `${baseUrl}/api/media/${filenamePart}`;
+        // Usar el servicio de archivos de Supabase para obtener URL normalizada
+        const downloadUrl = Services.File.normalizeImageUrl(filenamePart);
 
-        // Añadir timestamp para evitar caché y token para autenticación
+        // Añadir timestamp para evitar caché
         const timestamp = Date.now();
-        const finalDownloadUrl = `${downloadUrl}?t=${timestamp}&download=true&token=${token}`;
+        const finalDownloadUrl = `${downloadUrl}?t=${timestamp}`;
 
         try {
           // Descargar el archivo
           const downloadResult = await FileSystem.downloadAsync(
             finalDownloadUrl,
-            localUri,
-            { headers }
+            localUri
           );
 
           // Verificar si la descarga fue exitosa

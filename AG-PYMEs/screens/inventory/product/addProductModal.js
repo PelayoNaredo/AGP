@@ -14,12 +14,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { Services } from "../../../api/index";
 import BarcodeScanner from "../../../components/BarcodeScanner";
 import useNotifications from "../../../hooks/useNotifications";
+import { useCompanyLimits } from "../../../hooks/useCompanyLimits";
 
 // Componente AddProductModal para crear o editar productos en el inventario
 const AddProductModal = ({ visible, onClose, product, onCreateSuccess }) => {
   const { themeObject } = useTheme();
   const styles = createStyles(themeObject);
   const { showError } = useNotifications();
+  const { canAddProduct } = useCompanyLimits();
 
   const [formData, setFormData] = useState({
     nombre_producto: "",
@@ -157,9 +159,20 @@ const AddProductModal = ({ visible, onClose, product, onCreateSuccess }) => {
   // Manejar el envío del formulario
   const handleSubmit = async () => {
     if (!validateForm()) {
-      showError("Error", "Por favor, complete todos los campos requeridos correctamente"
+      showError(
+        "Error",
+        "Por favor, complete todos los campos requeridos correctamente"
       );
       return;
+    }
+
+    // Si es una creación (no edición), validar límites
+    if (!product) {
+      const canAdd = await canAddProduct();
+      if (!canAdd.allowed) {
+        showError("Límite alcanzado", canAdd.message);
+        return;
+      }
     }
 
     setIsSubmitting(true);

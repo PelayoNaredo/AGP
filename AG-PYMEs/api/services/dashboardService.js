@@ -1,5 +1,4 @@
-import { httpFetch } from "../http";
-import { dashboardEndpoint } from "../endpoints";
+import { EdgeFunctions } from "../../config/supabase";
 import { createServiceAdapter } from "../../cache/adapters/ServiceAdapter.js";
 
 /**
@@ -75,13 +74,15 @@ class DashboardService {
     try {
       const startTime = Date.now();
 
-      // Llamada al servidor
-      const data = await httpFetch(dashboardEndpoint.getDashboardData());
-
-      const duration = Date.now() - startTime;
-      return data;
+      // Llamada a Edge Functions
+      const result = await EdgeFunctions.dashboard.getData();
+      if (result.success) {
+        const duration = Date.now() - startTime;
+        return result.data;
+      }
+      throw new Error(result.error || "Error al obtener datos del dashboard");
     } catch (error) {
-      console.error("[DASHBOARD_SERVICE]   Error al obtener datos:", error);
+      console.error("[DASHBOARD_SERVICE] Error al obtener datos:", error);
       throw error;
     }
   }
@@ -97,6 +98,16 @@ class DashboardService {
       await adapter.invalidateService();
     } else {
       console.warn("[DASHBOARD_SERVICE] Cache no disponible para invalidación");
+    }
+
+    // También llamar al Edge Function para invalidar cache del servidor
+    try {
+      await EdgeFunctions.dashboard.invalidateCache();
+    } catch (error) {
+      console.warn(
+        "[DASHBOARD_SERVICE] No se pudo invalidar cache del servidor:",
+        error
+      );
     }
   }
 }
