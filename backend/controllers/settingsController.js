@@ -3,6 +3,12 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
+// =====================================================
+// CONTROLADOR ACTUALIZADO CON MULTI-TENANCY
+// Fecha: 8 de agosto de 2025
+// Cambios: Agregado soporte para company_id y RLS
+// =====================================================
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const MEDIA_DIR = path.join(__dirname, "..", "media");
@@ -23,10 +29,11 @@ const cleanOldLogo = async (oldLogoUrl) => {
   }
 };
 
-// Obtener un ajuste por ID
+// Obtener un ajuste por ID (RLS automático)
 export const getSettingById = async (req, res) => {
   const { id } = req.params;
   try {
+    // ← CAMBIO: RLS garantiza que solo se vean ajustes de la empresa actual
     const result = await pool.query(
       "SELECT * FROM settings WHERE id_ajuste = $1",
       [id]
@@ -42,7 +49,7 @@ export const getSettingById = async (req, res) => {
   }
 };
 
-// Crear un nuevo ajuste
+// Crear un nuevo ajuste (ahora incluye company_id automáticamente)
 export const createSetting = async (req, res) => {
   const {
     nombre_local,
@@ -56,10 +63,12 @@ export const createSetting = async (req, res) => {
     tema,
   } = req.body;
   try {
+    // ← CAMBIO: Incluir company_id del contexto de tenant
     const result = await pool.query(
-      `INSERT INTO settings (nombre_local, direccion, telefono, url_backend, horario_apertura, horario_cierre, logo_local, tema)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      `INSERT INTO settings (company_id, nombre_local, direccion, telefono, url_backend, horario_apertura, horario_cierre, logo_local, tema)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
       [
+        req.companyId, // ← NUEVO: company_id del middleware tenantContext
         nombre_local,
         direccion,
         telefono,
@@ -135,7 +144,7 @@ export const updateSettingLogo = async (req, res) => {
       return res.status(500).json({ message: "Error al guardar el archivo" });
     }
 
-    // Obtener el logo actual antes de actualizarlo
+    // Obtener el logo actual antes de actualizarlo (RLS automático)
     const currentSettings = await client.query(
       "SELECT logo_local FROM settings WHERE id_ajuste = 1"
     );

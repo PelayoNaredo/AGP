@@ -32,6 +32,7 @@ import appointmentsRoutes from "./routes/appointmentsRoutes.js";
 import salesRoutes from "./routes/salesRoutes.js";
 import fileRoutes from "./routes/fileRoutes.js";
 import signedUrlRoutes from "./routes/signedUrlRoutes.js";
+import companiesRoutes from "./routes/companiesRoutes.js"; // ← NUEVO
 
 const PORT = process.env.PORT;
 const DB_HOST = process.env.DB_HOST;
@@ -127,6 +128,7 @@ app.use("/api", appointmentsRoutes);
 app.use("/api", salesRoutes);
 app.use("/api", fileRoutes);
 app.use("/api", signedUrlRoutes);
+app.use("/api", companiesRoutes); // ← NUEVO: Rutas multi-tenant
 
 // Ruta adicional para manejar acceso directo a /media (sin el prefijo /api)
 // Esto soluciona problemas con ngrok que puede estar redirigiendo directamente a /media

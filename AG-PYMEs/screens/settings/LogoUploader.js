@@ -14,8 +14,8 @@ import LogoImage from "../../components/LogoImage";
 import useNotifications from "../../hooks/useNotifications";
 
 const { width } = Dimensions.get("window");
-const LOGO_SIZE = width * 0.2;
-const UPLOAD_BUTTON_SIZE = width * 0.2;
+const LOGO_SIZE = Math.min(80, width * 0.12); // Mucho más pequeño: máximo 80px
+const UPLOAD_BUTTON_SIZE = Math.min(80, width * 0.12); // Mucho más pequeño: máximo 80px
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png"];
 
@@ -57,8 +57,9 @@ const LogoUploader = ({ onLogoChange, currentLogo }) => {
 
       const result = await Services.File.upload(file);
 
-      if (result?.url) {
+      if (result?.url || result?.path) {
         onLogoChange(result.path || result.url);
+        showSuccess("Logo actualizado correctamente");
       } else {
         throw new Error("No se recibió URL del servidor");
       }
@@ -78,6 +79,17 @@ const LogoUploader = ({ onLogoChange, currentLogo }) => {
     }
   };
 
+  const handleRemoveLogo = async () => {
+    showConfirmDialog(
+      "Eliminar logo",
+      "¿Deseas quitar el logo actual?",
+      async () => {
+        onLogoChange("");
+        showSuccess("Logo eliminado");
+      }
+    );
+  };
+
   const handleImageError = () => {
     console.error("[LogoUploader] Error al cargar la imagen de logo");
     setError("No se pudo cargar el logo");
@@ -89,17 +101,28 @@ const LogoUploader = ({ onLogoChange, currentLogo }) => {
     >
       <Card.Title
         title="Logo de la empresa"
-        titleStyle={{ paddingTop: 4, fontWeight: "bold" }}
+        subtitle="Logo para documentos y recibos"
+        titleStyle={{ paddingTop: 2, fontWeight: "bold", fontSize: 16 }}
+        subtitleStyle={{ fontSize: 11, opacity: 0.6 }}
         left={(props) => (
           <IconButton
             {...props}
             icon="image-outline"
-            size={24}
+            size={20}
             iconColor={themeObject.colors.text}
           />
         )}
+        right={(props) =>
+          currentLogo ? (
+            <IconButton
+              {...props}
+              icon="trash-can-outline"
+              onPress={handleRemoveLogo}
+            />
+          ) : null
+        }
       />
-      <Card.Content>
+      <Card.Content style={styles.cardContent}>
         <View style={styles.container}>
           <View style={styles.logoContainer}>
             <LogoImage
@@ -147,11 +170,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-evenly",
     alignItems: "center",
-    gap: 20,
+    gap: 8,
+    paddingVertical: 8,
   },
   card: {
-    margin: 10,
-    borderRadius: 10,
+    margin: 6,
+    borderRadius: 12,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+  },
+  cardContent: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
   logoContainer: {
     width: LOGO_SIZE,
@@ -160,13 +193,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   logoImageContainer: {
-    borderRadius: 8,
+    borderRadius: 6,
   },
   logoImage: {
-    borderRadius: 8,
+    borderRadius: 6,
   },
   uploaderContainer: {
     width: UPLOAD_BUTTON_SIZE,
+    alignItems: "center",
   },
   uploadButton: {
     width: UPLOAD_BUTTON_SIZE,
@@ -174,23 +208,27 @@ const styles = StyleSheet.create({
   },
   uploadingContainer: {
     alignItems: "center",
-    gap: 10,
+    gap: 6,
   },
   uploadingText: {
-    marginTop: 10,
+    marginTop: 4,
+    fontSize: 11,
   },
   helperTextContainer: {
-    marginTop: 20,
+    marginTop: 8,
     alignItems: "center",
   },
   helperText: {
-    fontSize: 12,
-    opacity: 0.7,
+    fontSize: 10,
+    opacity: 0.6,
+    textAlign: "center",
+    lineHeight: 12,
   },
   errorText: {
     color: "red",
-    marginTop: 10,
+    marginTop: 6,
     textAlign: "center",
+    fontSize: 11,
   },
 });
 

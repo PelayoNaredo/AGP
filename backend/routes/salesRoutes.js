@@ -1,4 +1,10 @@
 import express from "express";
+import verifyToken from "../middleware/verifyToken.js";
+import tenantContext from "../middleware/tenantContext.js";
+import {
+  checkResourceLimit,
+  monitorResourceUsage,
+} from "../middleware/featureAccess.js";
 import {
   getAllSales,
   getSaleById,
@@ -17,10 +23,22 @@ import {
 
 const router = express.Router();
 
+// ← CAMBIO: Aplicar middleware de autenticación y contexto de tenant a todas las rutas
+router.use(verifyToken);
+router.use(tenantContext);
+
 // Rutas de operaciones CRUD básicas
 router.get("/sales", getAllSales);
 router.get("/sales/:id", getSaleById);
-router.post("/sales", createSale);
+
+// Verificar límites antes de crear venta/factura y monitorear uso
+router.post(
+  "/sales",
+  checkResourceLimit("invoices", 1), // Las ventas cuentan como facturas
+  monitorResourceUsage("invoices", 85), // Alertar al 85%
+  createSale
+);
+
 router.put("/sales/:id", updateSale);
 router.delete("/sales/:id", deleteSale);
 

@@ -24,6 +24,7 @@ import SalesScreen from "../screens/sales/SalesScreen";
 import EmployeesScreen from "../screens/employees/EmployeesScreen";
 import FinancialScreen from "../screens/financial/FinancialScreen";
 import SettingsScreen from "../screens/settings/SettingsScreen";
+import CompanySelectionScreen from "../screens/CompanySelection/CompanySelectionScreen";
 import AlertsScreen from "../screens/alerts/AlertsScreen";
 import Header from "../components/header";
 
@@ -275,6 +276,26 @@ const AppStack = () => {
         options={{
           headerShown: true,
           title: "Configuración",
+          headerStyle: {
+            height: 40, // Reducir altura del header
+            elevation: 0, // Sin sombra en Android
+            shadowOpacity: 0, // Sin sombra en iOS
+          },
+          headerTitleStyle: {
+            fontSize: 18,
+            fontWeight: "600",
+          },
+          headerTitleContainerStyle: {
+            paddingTop: 0,
+          },
+        }}
+      />
+      <Stack.Screen
+        name="CompanySelection"
+        component={CompanySelectionScreen}
+        options={{
+          headerShown: true,
+          title: "Seleccionar Empresa",
           headerStyle: {
             height: 40, // Reducir altura del header
             elevation: 0, // Sin sombra en Android

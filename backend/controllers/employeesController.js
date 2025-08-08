@@ -1,9 +1,10 @@
 import pool from "../db.js"; // importamos la conexion a la bd
 
-// Obtener todos los empleados
+// Obtener todos los empleados (filtrados automáticamente por RLS)
 export const getAllEmployees = async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM employees");
+    // ← CAMBIO: RLS filtra automáticamente por company_id
+    const result = await pool.query("SELECT * FROM employees ORDER BY nombre");
 
     res.json(result.rows);
   } catch (error) {
@@ -16,7 +17,7 @@ export const getAllEmployees = async (req, res) => {
   }
 };
 
-// Obtener un empleado por ID
+// Obtener un empleado por ID (RLS automático)
 export const getEmployeeById = async (req, res) => {
   const { id } = req.params;
 
@@ -26,6 +27,7 @@ export const getEmployeeById = async (req, res) => {
   }
 
   try {
+    // ← CAMBIO: RLS garantiza que solo se vean empleados de la empresa actual
     const result = await pool.query(
       "SELECT * FROM employees WHERE id_empleado = $1",
       [id]
@@ -90,17 +92,19 @@ export const createEmployee = async (req, res) => {
   const documentos = req.files?.map((file) => file.filename) || [];
 
   try {
+    // ← CAMBIO: Incluir company_id del contexto de tenant
     const result = await pool.query(
       `INSERT INTO employees (
-        nombre, dni, nss, email, telefono, telefono_emergencia,
+        company_id, nombre, dni, nss, email, telefono, telefono_emergencia,
         direccion, codigo_postal, ciudad, pais,
         fecha_contratacion, fecha_nacimiento, cargo,
         departamento, horas_contratadas, tipo_contrato,
         salario, activo, documento_adjunto, notas
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
       RETURNING *`,
       [
+        req.companyId, // ← NUEVO: company_id del middleware tenantContext
         nombre,
         dni,
         nss,

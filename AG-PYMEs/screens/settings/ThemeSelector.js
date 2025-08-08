@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet } from "react-native";
+import { StyleSheet, View, Text } from "react-native";
 import { Card, IconButton } from "react-native-paper";
 import { useTheme } from "../../context/ThemeContext";
 import CustomButton from "../../components/customButton";
@@ -31,6 +31,7 @@ const ThemeSelector = ({ onThemeChange }) => {
     >
       <Card.Title
         title="Tema de la Aplicación"
+        subtitle="Elige cómo se ve la interfaz"
         titleStyle={{ paddingTop: 4, fontWeight: "bold" }}
         left={(props) => (
           <IconButton
@@ -44,7 +45,7 @@ const ThemeSelector = ({ onThemeChange }) => {
       <Card.Content style={styles.buttonContainer}>
         <CustomButton
           onPress={() => handleThemeChange("claro")}
-          variant={theme === "claro" ? "primary" : "ghost"}
+          variant={theme === "claro" ? "primary" : "outline"}
           style={styles.button}
           ionIconLeft={theme === "claro" ? "sunny" : "sunny-outline"}
         >
@@ -52,25 +53,29 @@ const ThemeSelector = ({ onThemeChange }) => {
         </CustomButton>
         <CustomButton
           onPress={() => handleThemeChange("oscuro")}
-          variant={theme === "oscuro" ? "primary" : "ghost"}
+          variant={theme === "oscuro" ? "primary" : "outline"}
           style={styles.button}
           ionIconLeft={theme === "oscuro" ? "moon" : "moon-outline"}
         >
           Oscuro
         </CustomButton>
       </Card.Content>
+      <View style={styles.hintContainer}>
+        <Text style={styles.hint}>Puedes cambiarlo cuando quieras.</Text>
+      </View>
     </Card>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    margin: 10,
-    borderRadius: 10,
-  },
-  label: {
-    fontSize: 16,
-    marginBottom: 10,
+    margin: 6,
+    borderRadius: 12,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
   },
   buttonContainer: {
     flexDirection: "row",
@@ -81,6 +86,14 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 5,
     fontSize: 18,
+  },
+  hintContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  hint: {
+    fontSize: 11,
+    opacity: 0.7,
   },
 });
 

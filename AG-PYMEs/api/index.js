@@ -4,6 +4,8 @@
 import { BaseStorage, TokenStorage, ImageStorage } from "./services/storage";
 import AuthService from "./services/authService";
 import FileService from "./services/file";
+import { CompaniesService } from "./services/companiesService"; // ← EXISTENTE: Servicio de empresas
+import PlansService from "./services/plansService"; // ← NUEVO: Servicio de planes
 
 // Importar servicio de alertas con cache
 import {
@@ -145,6 +147,10 @@ import ImageWithAuth from "../components/ImageWithAuth";
 const Services = {
   //Servicios de autenticación
   Auth: AuthService,
+
+  // ← SERVICIOS DE EMPRESAS MULTI-TENANT
+  Company: CompaniesService,
+  Plans: PlansService, // ← NUEVO: Servicio de planes
 
   //Servicios para el manejo de datos
   Data: {

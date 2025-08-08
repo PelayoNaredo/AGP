@@ -11,8 +11,18 @@ import {
   getMonthlyShiftsForExport,
   copyShifts,
 } from "../controllers/shiftsController.js";
+import verifyToken from "../middleware/verifyToken.js";
+import tenantContext from "../middleware/tenantContext.js";
+import {
+  checkResourceLimit,
+  monitorResourceUsage,
+} from "../middleware/featureAccess.js";
 
 const router = express.Router();
+
+// Aplicar middlewares a todas las rutas
+router.use(verifyToken);
+router.use(tenantContext);
 
 // Ruta para obtener horarios por fecha
 router.get("/shifts/date/:fecha_inicio_semana", getShiftByDate);
@@ -27,10 +37,19 @@ router.get("/shifts/export/month/:fecha_inicio_mes", getMonthlyShiftsForExport);
 router.post("/shifts/copy", copyShifts);
 
 // Ruta unificada para crear/actualizar
-router.post("/shifts/save", saveShift);
+router.post(
+  "/shifts/save",
+  checkResourceLimit("shifts", 1),
+  monitorResourceUsage("shifts", 85),
+  saveShift
+);
 
 // Rutas para intervalos
-router.post("/shifts/:id/intervals", saveInterval);
+router.post(
+  "/shifts/:id/intervals",
+  monitorResourceUsage("shifts", 85),
+  saveInterval
+);
 router.delete("/shifts/:id/intervals/:intervalId", deleteInterval);
 
 // Rutas restantes

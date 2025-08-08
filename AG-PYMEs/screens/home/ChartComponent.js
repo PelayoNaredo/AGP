@@ -32,8 +32,8 @@ export const ChartComponent = ({ data }) => {
   const [selectedPoint, setSelectedPoint] = React.useState(null);
   const [tooltipVisible, setTooltipVisible] = React.useState(false);
 
-  // Detectar plataforma web para evitar warnings de eventos táctiles
-  const suppressWebWarnings = isWeb;
+  // En web ocultamos los data points para evitar warnings en SVG
+  const showPoints = !isWeb;
 
   // Validar que tenemos datos de tendencia temporal
   const isTemporalData =
@@ -160,19 +160,19 @@ export const ChartComponent = ({ data }) => {
         color={colors.balance}
         thickness={3}
         dataPointsColor={colors.balance}
-        dataPointsRadius={6}
+        dataPointsRadius={showPoints ? 6 : 0}
         // Segunda línea: Ingresos
         data2={ingresosData}
         color2={colors.ingresos}
         thickness2={3}
         dataPointsColor2={colors.ingresos}
-        dataPointsRadius2={6}
+        dataPointsRadius2={showPoints ? 6 : 0}
         // Tercera línea: Gastos
         data3={gastosData}
         color3={colors.gastos}
         thickness3={3}
         dataPointsColor3={colors.gastos}
-        dataPointsRadius3={6}
+        dataPointsRadius3={showPoints ? 6 : 0}
         // Configuración del gráfico para mayor espaciado
         width={chartWidth}
         height={chartHeight}
@@ -185,8 +185,8 @@ export const ChartComponent = ({ data }) => {
         stepValue={yAxisStep}
         noOfSections={Math.floor((yAxisMax - yAxisMin) / yAxisStep)}
         formatYLabel={formatYAxisLabel}
-        // Configuración básica mejorada para web
-        hideDataPoints={false}
+        // En web, ocultar puntos para evitar props de responder en SVG
+        hideDataPoints={!showPoints}
         showValuesAsDataPointsText={false}
         // Estilos y colores
         textColor={themeObject.colors.text}

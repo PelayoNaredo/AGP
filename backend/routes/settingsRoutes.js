@@ -7,12 +7,14 @@ import {
 } from "../controllers/settingsController.js";
 import { upload, handleUploadErrors } from "../middleware/upload.js";
 import verifyToken from "../middleware/verifyToken.js";
+import tenantContext from "../middleware/tenantContext.js";
 import { validateSettingsUpdate } from "../middleware/validators.js";
 
 const router = Router();
 
-// Middleware de autenticación para todas las rutas
+// Middleware de autenticación y contexto para todas las rutas
 router.use(verifyToken);
+router.use(tenantContext);
 
 // GET - Obtener configuración por ID
 router.get("/settings/:id", async (req, res, next) => {

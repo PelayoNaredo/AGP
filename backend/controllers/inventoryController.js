@@ -1,9 +1,12 @@
 import pool from "../db.js"; // importamos la conexion a la bd
 
-// Obtener todos los productos del inventario
+// Obtener todos los productos del inventario (filtrados automáticamente por RLS)
 export const getAllInventory = async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM inventory");
+    // ← CAMBIO: RLS filtra automáticamente por company_id
+    const result = await pool.query(
+      "SELECT * FROM inventory ORDER BY nombre_producto"
+    );
     res.json(result.rows);
   } catch (error) {
     console.error("Error al obtener el inventario:", error);
@@ -11,10 +14,11 @@ export const getAllInventory = async (req, res) => {
   }
 };
 
-// Obtener un producto por ID
+// Obtener un producto por ID (RLS automático)
 export const getProductById = async (req, res) => {
   const { id } = req.params;
   try {
+    // ← CAMBIO: RLS garantiza que solo se vean productos de la empresa actual
     const result = await pool.query(
       "SELECT * FROM inventory WHERE id_producto = $1",
       [id]
@@ -29,7 +33,7 @@ export const getProductById = async (req, res) => {
   }
 };
 
-// Crear un nuevo producto
+// Crear un nuevo producto (ahora incluye company_id automáticamente)
 export const createProduct = async (req, res) => {
   const {
     nombre_producto,
@@ -43,10 +47,12 @@ export const createProduct = async (req, res) => {
     pvp,
   } = req.body;
   try {
+    // ← CAMBIO: Incluir company_id del contexto de tenant
     const result = await pool.query(
-      `INSERT INTO inventory (nombre_producto, descripcion, cantidad_actual, cantidad_minima, precio_unitario, id_proveedor, fecha_actualizacion, referencia, pvp)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      `INSERT INTO inventory (company_id, nombre_producto, descripcion, cantidad_actual, cantidad_minima, precio_unitario, id_proveedor, fecha_actualizacion, referencia, pvp)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
       [
+        req.companyId, // ← NUEVO: company_id del middleware tenantContext
         nombre_producto,
         descripcion,
         cantidad_actual,

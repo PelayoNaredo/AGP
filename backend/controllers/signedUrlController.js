@@ -1,5 +1,10 @@
 import { generateSignedUrl } from "../middleware/signedUrl.js";
 
+// =====================================================
+// CONTROLADOR DE URLs FIRMADAS - NO REQUIERE MULTI-TENANCY
+// Las URLs firmadas son utilidades del sistema, no específicas por empresa
+// =====================================================
+
 // Genera una URL firmada para acceder a un archivo
 export const generateSignedUrlController = (req, res) => {
   try {

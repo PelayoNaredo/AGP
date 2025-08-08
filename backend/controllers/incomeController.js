@@ -1,8 +1,9 @@
 import pool from "../db.js"; // importamos la conexion a la bd
 
-// Obtener todos los ingresos
+// Obtener todos los ingresos (filtrados automáticamente por RLS)
 export const getAllIncome = async (req, res) => {
   try {
+    // ← CAMBIO: RLS filtra automáticamente por company_id
     const result = await pool.query(
       `SELECT * FROM income ORDER BY fecha_ingreso DESC`
     );
@@ -13,7 +14,7 @@ export const getAllIncome = async (req, res) => {
   }
 };
 
-// Obtener un ingreso por ID
+// Obtener un ingreso por ID (RLS automático)
 export const getIncomeById = async (req, res) => {
   const { id } = req.params;
 
@@ -22,6 +23,7 @@ export const getIncomeById = async (req, res) => {
   }
 
   try {
+    // ← CAMBIO: RLS garantiza que solo se vean ingresos de la empresa actual
     const result = await pool.query(
       `SELECT * FROM income WHERE id_ingreso = $1`,
       [id]
@@ -58,10 +60,12 @@ export const createIncome = async (req, res) => {
   }
 
   try {
+    // ← CAMBIO: Incluir company_id del contexto de tenant
     const result = await pool.query(
-      `INSERT INTO income (fecha_ingreso, ingresos, concepto, categoria, comentarios, metodo_ingreso)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      `INSERT INTO income (company_id, fecha_ingreso, ingresos, concepto, categoria, comentarios, metodo_ingreso)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
       [
+        req.companyId, // ← NUEVO: company_id del middleware tenantContext
         fecha_ingreso || new Date(),
         ingresos,
         concepto,

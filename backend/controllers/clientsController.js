@@ -1,8 +1,15 @@
 import pool from "../db.js";
 
-// Obtener todos los clientes
+// =====================================================
+// CONTROLADOR ACTUALIZADO CON MULTI-TENANCY
+// Fecha: 8 de agosto de 2025
+// Cambios: Agregado soporte para company_id y RLS
+// =====================================================
+
+// Obtener todos los clientes (ahora filtrado por empresa automáticamente con RLS)
 export const getAllClients = async (req, res) => {
   try {
+    // Con RLS habilitado, esta query solo retornará clientes de la empresa actual
     const result = await pool.query("SELECT * FROM clients ORDER BY nombre");
     res.status(200).json(result.rows);
   } catch (err) {
@@ -11,10 +18,11 @@ export const getAllClients = async (req, res) => {
   }
 };
 
-// Obtener un cliente por ID
+// Obtener un cliente por ID (RLS automático)
 export const getClientById = async (req, res) => {
   const { id } = req.params;
   try {
+    // RLS garantiza que solo se vean clientes de la empresa actual
     const result = await pool.query(
       "SELECT * FROM clients WHERE id_cliente = $1",
       [id]
@@ -29,7 +37,7 @@ export const getClientById = async (req, res) => {
   }
 };
 
-// Crear un nuevo cliente
+// Crear un nuevo cliente (ahora incluye company_id automáticamente)
 export const createClient = async (req, res) => {
   const {
     tipo_cliente,
@@ -65,14 +73,16 @@ export const createClient = async (req, res) => {
   }
 
   try {
+    // ← CAMBIO: Incluir company_id del contexto de tenant
     const result = await pool.query(
       `INSERT INTO clients (
-        tipo_cliente, nombre, apellido, tipo_documento, documento, 
+        company_id, tipo_cliente, nombre, apellido, tipo_documento, documento, 
         direccion, codigo_postal, ciudad, provincia, pais, 
         telefono, email, razon_social, regimen_fiscal, tipo_iva,
         descuento_preferencial, notas
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING *`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING *`,
       [
+        req.companyId, // ← NUEVO: company_id del middleware tenantContext
         tipo_cliente,
         nombre || "",
         apellido || "",

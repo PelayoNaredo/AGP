@@ -6,6 +6,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const mediaPath = path.join(__dirname, "..", "media");
 
+// =====================================================
+// CONTROLADOR DE ARCHIVOS - NO REQUIERE MULTI-TENANCY
+// Los archivos son globales del sistema, no por empresa
+// =====================================================
+
 // Asegurar que el directorio media existe
 try {
   if (!fs.existsSync(mediaPath)) {

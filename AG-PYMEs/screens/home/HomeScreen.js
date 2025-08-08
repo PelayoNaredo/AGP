@@ -16,10 +16,10 @@ import { OrdersCard } from "./OrdersCard";
 import { MarginCard } from "./MarginCard";
 import { TopProductsCard } from "./TopProductsCard";
 import { ProfitabilityCard } from "./ProfitabilityCard";
-import { ProductServiceBalanceCard } from "./ProductServiceBalanceCard";
+import ProductServiceBalanceCard from "./ProductServiceBalanceCard";
 import AlertManager from "../../components/alertManager";
 import { useTheme } from "../../context/ThemeContext";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect } from "@react-navigation/native"; // Limpieza
 import { Services } from "../../api/index";
 
 const { width } = Dimensions.get("window");
@@ -54,7 +54,8 @@ const SectionTitle = ({ icon, title, delay = 0 }) => {
 };
 
 const HomeScreen = ({ navigation }) => {
-  const { themeObject, theme } = useTheme();
+  const { themeObject } = useTheme(); // Limpieza
+  // const { company, limits, usageStats } = useCompany(); // REMOVIDO
 
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -195,6 +196,8 @@ const HomeScreen = ({ navigation }) => {
       >
         Dashboard
       </Animated.Text>
+
+      {/* Información de Empresa - REMOVIDA (ahora se muestra plan en el header) */}
 
       <AnimatedCard delay={100}>
         <View style={styles.alertContainer}>

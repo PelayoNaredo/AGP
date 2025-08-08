@@ -1,6 +1,6 @@
 import { NGROK_HOST } from "@env";
 
-const BASE = NGROK_HOST;
+const BASE = NGROK_HOST || "http://localhost:3000"; // ← fallback explícito
 
 export const alertsEndpoint = {
   base: () => `${BASE}/api/alerts`,
@@ -128,6 +128,17 @@ export const usersEndpoint = {
 
 export const dashboardEndpoint = {
   getDashboardData: () => `${BASE}/api/dashboard`,
+};
+
+// NUEVOS: Endpoints de compañías (multi-tenant)
+export const companiesEndpoint = {
+  current: () => `${BASE}/api/companies/current`,
+  usage: () => `${BASE}/api/companies/usage`,
+  limits: () => `${BASE}/api/companies/limits`,
+  settings: () => `${BASE}/api/companies/settings`,
+  validateLimit: () => `${BASE}/api/companies/validate-limit`,
+  invitation: () => `${BASE}/api/companies/invitation`,
+  users: () => `${BASE}/api/companies/users`,
 };
 
 export const BASE_URL = BASE;

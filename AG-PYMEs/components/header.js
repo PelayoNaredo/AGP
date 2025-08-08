@@ -15,6 +15,8 @@ import { Services } from "../api";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import LogoImage from "./LogoImage";
 import logoImage from "../assets/logo.png";
+import { Chip } from "react-native-paper"; // NUEVO
+import { useCompany } from "../context/CompanyContext"; // NUEVO
 
 const CustomHeader = ({ navigation: navProp, route, options, back }) => {
   const { theme, themeObject } = useTheme();
@@ -28,7 +30,10 @@ const CustomHeader = ({ navigation: navProp, route, options, back }) => {
   const [menuAnimation] = useState(new Animated.Value(0));
   const isSettingsScreen = route?.name === "Settings";
   const isAlertsScreen = route?.name === "Alerts";
+  const isCompanySelectionScreen = route?.name === "CompanySelection";
   const nav = navProp || navigation;
+  const { company } = useCompany(); // NUEVO
+
   const fetchSettings = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -103,6 +108,20 @@ const CustomHeader = ({ navigation: navProp, route, options, back }) => {
     }
   };
 
+  const handleCompanySelection = () => {
+    setIsMenuExpanded(false);
+    // Forzar la animación inmediatamente
+    Animated.timing(menuAnimation, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+
+    if (nav?.navigate) {
+      nav.navigate("CompanySelection");
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -125,7 +144,7 @@ const CustomHeader = ({ navigation: navProp, route, options, back }) => {
 
   // Cerrar el menú automáticamente en ciertas pantallas
   useEffect(() => {
-    if (isSettingsScreen || isAlertsScreen) {
+    if (isSettingsScreen || isAlertsScreen || isCompanySelectionScreen) {
       setIsMenuExpanded(false);
       // Forzar la animación a 0 para contraer completamente
       Animated.timing(menuAnimation, {
@@ -134,11 +153,17 @@ const CustomHeader = ({ navigation: navProp, route, options, back }) => {
         useNativeDriver: false,
       }).start();
     }
-  }, [isSettingsScreen, isAlertsScreen, menuAnimation, route?.name]);
+  }, [
+    isSettingsScreen,
+    isAlertsScreen,
+    isCompanySelectionScreen,
+    menuAnimation,
+    route?.name,
+  ]);
 
   const menuWidth = menuAnimation.interpolate({
     inputRange: [0, 1],
-    outputRange: [44, 220],
+    outputRange: [44, 260], // Aumentado de 220 a 260 para el nuevo icono
   });
 
   const menuBorderRadius = menuAnimation.interpolate({
@@ -152,7 +177,8 @@ const CustomHeader = ({ navigation: navProp, route, options, back }) => {
   });
 
   // Ocultar completamente el contenedor en pantallas restringidas
-  const shouldShowMenu = !isSettingsScreen && !isAlertsScreen;
+  const shouldShowMenu =
+    !isSettingsScreen && !isAlertsScreen && !isCompanySelectionScreen;
   return (
     <View
       style={[
@@ -187,9 +213,20 @@ const CustomHeader = ({ navigation: navProp, route, options, back }) => {
           </View>
         )}
         {!isLoading && (
-          <Text style={[styles.title, { color: themeObject.colors.text }]}>
-            {options?.title || localTitle}
-          </Text>
+          <View style={styles.titleRow}>
+            <Text style={[styles.title, { color: themeObject.colors.text }]}>
+              {options?.title || localTitle}
+            </Text>
+            {company?.plan && !back ? (
+              <Chip
+                mode="outlined"
+                style={styles.planChip}
+                textStyle={styles.planChipText}
+              >
+                {String(company.plan).toUpperCase()}
+              </Chip>
+            ) : null}
+          </View>
         )}
       </View>
       {/* Lado derecho - Menú de usuario */}
@@ -227,6 +264,17 @@ const CustomHeader = ({ navigation: navProp, route, options, back }) => {
                       </View>
                     )}
                   </View>
+                </Pressable>
+
+                <Pressable
+                  style={styles.menuIconButton}
+                  onPress={handleCompanySelection}
+                >
+                  <Icon
+                    name="business-outline"
+                    size={20}
+                    color={themeObject.colors.text}
+                  />
                 </Pressable>
 
                 <Pressable
@@ -284,6 +332,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
   },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   rightSection: {
     flexDirection: "row",
     alignItems: "center",
@@ -320,6 +373,17 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     fontVariant: "small-caps",
     color: "#2196F3",
+  },
+  planChip: {
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  planChipText: {
+    fontSize: 10,
+    lineHeight: 12,
+    textAlign: "center",
+    includeFontPadding: false,
   },
   userMenuContainer: {
     flexDirection: "row",

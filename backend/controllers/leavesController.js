@@ -1,9 +1,12 @@
 import pool from "../db.js"; // importamos la conexion a la bd
 
-// Obtener todas las bajas
+// Obtener todas las bajas (filtradas automáticamente por RLS)
 export const getLeaves = async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM leaves");
+    // ← CAMBIO: RLS filtra automáticamente por company_id
+    const result = await pool.query(
+      "SELECT * FROM leaves ORDER BY fecha_inicio DESC"
+    );
     res.status(200).json(result.rows);
   } catch (err) {
     console.error("Error al obtener bajas:", err);
@@ -11,10 +14,11 @@ export const getLeaves = async (req, res) => {
   }
 };
 
-// Obtener una baja por ID
+// Obtener una baja por ID (RLS automático)
 export const getLeaveById = async (req, res) => {
   const { id } = req.params;
   try {
+    // ← CAMBIO: RLS garantiza que solo se vean bajas de la empresa actual
     const result = await pool.query("SELECT * FROM leaves WHERE id_baja = $1", [
       id,
     ]);
@@ -33,10 +37,18 @@ export const createLeave = async (req, res) => {
   const { id_empleado, tipo_baja, fecha_inicio, fecha_fin, comentarios } =
     req.body;
   try {
+    // ← CAMBIO: Incluir company_id del contexto de tenant
     const result = await pool.query(
-      "INSERT INTO leaves (id_empleado, tipo_baja, fecha_inicio, fecha_fin, comentarios) " +
-        "VALUES ($1, $2, $3, $4, $5) RETURNING *",
-      [id_empleado, tipo_baja, fecha_inicio, fecha_fin, comentarios]
+      "INSERT INTO leaves (company_id, id_empleado, tipo_baja, fecha_inicio, fecha_fin, comentarios) " +
+        "VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+      [
+        req.companyId,
+        id_empleado,
+        tipo_baja,
+        fecha_inicio,
+        fecha_fin,
+        comentarios,
+      ]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, Text } from "react-native";
 import { Card, IconButton } from "react-native-paper";
 import CustomButton from "../../components/customButton";
 import { useTheme } from "../../context/ThemeContext";
@@ -10,15 +10,20 @@ const TimePickerSection = ({ settings, handleChange }) => {
   const { themeObject } = useTheme();
   const [openApertura, setOpenApertura] = useState(false);
   const [openCierre, setOpenCierre] = useState(false);
+  const [error, setError] = useState("");
 
   const onConfirmApertura = (time) => {
-    handleChange("horario_apertura", `${time}:00`);
+    const newVal = `${time}:00`;
+    handleChange("horario_apertura", newVal);
     setOpenApertura(false);
+    setError("");
   };
 
   const onConfirmCierre = (time) => {
-    handleChange("horario_cierre", `${time}:00`);
+    const newVal = `${time}:00`;
+    handleChange("horario_cierre", newVal);
     setOpenCierre(false);
+    setError("");
   };
 
   const formatTime = (timeString) => {
@@ -27,12 +32,24 @@ const TimePickerSection = ({ settings, handleChange }) => {
     return `${hours}:${minutes}`;
   };
 
+  const validateTimes = () => {
+    const a = settings.horario_apertura?.slice(0, 5);
+    const c = settings.horario_cierre?.slice(0, 5);
+    if (a && c && a >= c) {
+      setError("La hora de cierre debe ser posterior a la de apertura");
+      return false;
+    }
+    setError("");
+    return true;
+  };
+
   return (
     <Card
       style={[styles.card, { backgroundColor: themeObject.colors.surface }]}
     >
       <Card.Title
         title="Horarios de Apertura y Cierre"
+        subtitle="Define la disponibilidad del local"
         titleStyle={{ paddingTop: 4, fontWeight: "bold" }}
         left={(props) => (
           <IconButton
@@ -66,6 +83,9 @@ const TimePickerSection = ({ settings, handleChange }) => {
           </CustomButton>
         </View>
 
+        {!!error && <Text style={styles.error}>{error}</Text>}
+        <Text style={styles.hint}>Formato 24h. Ej: 09:00 - 18:00</Text>
+
         <TimeSelectorModal
           visible={openApertura}
           initialTime={settings.horario_apertura?.slice(0, 5)}
@@ -76,7 +96,10 @@ const TimePickerSection = ({ settings, handleChange }) => {
         <TimeSelectorModal
           visible={openCierre}
           initialTime={settings.horario_cierre?.slice(0, 5)}
-          onConfirm={onConfirmCierre}
+          onConfirm={(t) => {
+            onConfirmCierre(t);
+            validateTimes();
+          }}
           onClose={() => setOpenCierre(false)}
         />
       </Card.Content>
@@ -86,17 +109,32 @@ const TimePickerSection = ({ settings, handleChange }) => {
 
 const styles = StyleSheet.create({
   card: {
-    margin: 10,
-    borderRadius: 10,
+    margin: 6,
+    borderRadius: 12,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
   },
   timePickerContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 16,
+    marginBottom: 8,
   },
   timeButton: {
     flex: 1,
     marginHorizontal: 4,
+  },
+  hint: {
+    fontSize: 11,
+    opacity: 0.7,
+    marginTop: 4,
+  },
+  error: {
+    color: "#d32f2f",
+    fontSize: 12,
+    marginTop: 4,
   },
 });
 

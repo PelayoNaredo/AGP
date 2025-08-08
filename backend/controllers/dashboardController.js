@@ -1,7 +1,9 @@
 import pool from "../db.js";
 
+// Dashboard con datos filtrados automáticamente por RLS
 export const getDashboardData = async (req, res) => {
   try {
+    // ← CAMBIO: RLS filtra automáticamente todas las consultas por company_id
     // Obtener datos financieros comparativos (MANTENER PARA TARJETAS)
     const financialQuery = `
       WITH periodos AS (

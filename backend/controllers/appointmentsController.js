@@ -1,8 +1,9 @@
 import pool from "../db.js";
 
-// Obtener todas las citas
+// Obtener todas las citas (filtradas automáticamente por RLS)
 export const getAllAppointments = async (req, res) => {
   try {
+    // ← CAMBIO: RLS filtra automáticamente por company_id en todas las tablas relacionadas
     const result = await pool.query(`
       SELECT a.*, 
              c.nombre as nombre_cliente, c.apellido as apellido_cliente,
@@ -21,7 +22,7 @@ export const getAllAppointments = async (req, res) => {
   }
 };
 
-// Obtener citas por rango de fechas
+// Obtener citas por rango de fechas (RLS automático)
 export const getAppointmentsByDateRange = async (req, res) => {
   const { startDate, endDate } = req.query;
 
@@ -31,6 +32,7 @@ export const getAppointmentsByDateRange = async (req, res) => {
       .json({ message: "Se requieren fechas de inicio y fin" });
   }
   try {
+    // ← CAMBIO: RLS filtra automáticamente por company_id
     // Convertir las fechas a formato timestamp con timezone
     const result = await pool.query(
       `
@@ -253,16 +255,18 @@ export const createAppointment = async (req, res) => {
     const parsedFechaInicio = new Date(fecha_inicio);
     const parsedFechaFin = new Date(fecha_fin);
 
+    // ← CAMBIO: Incluir company_id del contexto de tenant
     // Convertir las fechas a formato timestamp sin timezone para PostgreSQL
     // Usa TIMESTAMPTZ para mantener la información de zona horaria
     const result = await client.query(
       `
       INSERT INTO appointments (
-        id_cliente, id_empleado, id_servicio, fecha_inicio, fecha_fin, estado, notas
-      ) VALUES ($1, $2, $3, $4::timestamptz, $5::timestamptz, $6, $7)
+        company_id, id_cliente, id_empleado, id_servicio, fecha_inicio, fecha_fin, estado, notas
+      ) VALUES ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz, $7, $8)
       RETURNING *
     `,
       [
+        req.companyId, // ← NUEVO: company_id del middleware tenantContext
         cleanedClientId,
         cleanedEmployeeId,
         cleanedServiceId,

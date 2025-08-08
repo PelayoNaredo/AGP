@@ -1,12 +1,14 @@
 import pool from "../db.js"; // importamos la conexion a la bd
 
-// Obtener todos los horarios
+// Obtener todos los horarios (filtrados automáticamente por RLS)
 export const getAllShifts = async (req, res) => {
   try {
+    // ← CAMBIO: RLS filtra automáticamente por company_id
     const result = await pool.query(`
       SELECT s.*, si.*
       FROM shifts s
       LEFT JOIN shift_intervals si ON s.id_horario = si.id_horario
+      ORDER BY s.nombre_horario
     `);
     res.json(result.rows);
   } catch (error) {
@@ -15,10 +17,11 @@ export const getAllShifts = async (req, res) => {
   }
 };
 
-// Obtener un horario por ID
+// Obtener un horario por ID (RLS automático)
 export const getShiftById = async (req, res) => {
   const { id } = req.params;
   try {
+    // ← CAMBIO: RLS garantiza que solo se vean horarios de la empresa actual
     const result = await pool.query(
       `
       SELECT s.*, si.*

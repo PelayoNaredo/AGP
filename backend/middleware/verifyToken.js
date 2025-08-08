@@ -51,10 +51,16 @@ const verifyToken = (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+    console.log(
+      "[VERIFY-TOKEN] Decoded token:",
+      JSON.stringify(decoded, null, 2)
+    );
+
     if (!decoded.id_usuario || !decoded.email) {
       console.error(
         "[ERROR] Token decodificado no contiene la información necesaria"
       );
+      console.error("[ERROR] Decoded object:", decoded);
       return res.status(401).json({
         error: "Token inválido",
         details: "El token no contiene la información requerida",
@@ -65,10 +71,18 @@ const verifyToken = (req, res, next) => {
     req.user = {
       id: decoded.id_usuario,
       email: decoded.email,
+      company_id: decoded.company_id, // ← NUEVO: company_id para multi-tenancy
+      role: decoded.role || decoded.rol, // Compatibilidad con ambos nombres
+      nombre: decoded.nombre,
       // Añadir otros campos necesarios del token
       iat: decoded.iat,
       exp: decoded.exp,
     };
+
+    console.log(
+      "[VERIFY-TOKEN] User object created:",
+      JSON.stringify(req.user, null, 2)
+    );
 
     // Verificar si el token está próximo a expirar (menos de 1 hora)
     const horaParaExpirar = decoded.exp - Math.floor(Date.now() / 1000);

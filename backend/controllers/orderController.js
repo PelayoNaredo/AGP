@@ -1,9 +1,12 @@
 import pool from "../db.js";
 
-// Obtener todas las órdenes
+// Obtener todas las órdenes (filtradas automáticamente por RLS)
 export const getAllOrders = async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM "orders"');
+    // ← CAMBIO: RLS filtra automáticamente por company_id
+    const result = await pool.query(
+      'SELECT * FROM "orders" ORDER BY fecha_pedido DESC'
+    );
     res.json(result.rows);
   } catch (error) {
     console.error("Error al obtener las órdenes:", error);
@@ -11,10 +14,11 @@ export const getAllOrders = async (req, res) => {
   }
 };
 
-// Obtener una orden por ID
+// Obtener una orden por ID (RLS automático)
 export const getOrderById = async (req, res) => {
   const { id } = req.params;
   try {
+    // ← CAMBIO: RLS garantiza que solo se vean órdenes de la empresa actual
     const result = await pool.query(
       'SELECT * FROM "orders" WHERE id_pedido = $1',
       [id]
@@ -29,7 +33,7 @@ export const getOrderById = async (req, res) => {
   }
 };
 
-// Crear una nueva orden
+// Crear una nueva orden (ahora incluye company_id automáticamente)
 export const createOrder = async (req, res) => {
   const {
     id_proveedor,
@@ -41,10 +45,12 @@ export const createOrder = async (req, res) => {
     comentarios,
   } = req.body;
   try {
+    // ← CAMBIO: Incluir company_id del contexto de tenant
     const result = await pool.query(
-      `INSERT INTO "orders" (id_proveedor, id_gasto, fecha_entrega_estimada, estado, total, metodo_pago, comentarios)
-             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      `INSERT INTO "orders" (company_id, id_proveedor, id_gasto, fecha_entrega_estimada, estado, total, metodo_pago, comentarios)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [
+        req.companyId, // ← NUEVO: company_id del middleware tenantContext
         id_proveedor,
         id_gasto,
         fecha_entrega_estimada,

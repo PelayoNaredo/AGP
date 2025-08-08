@@ -2,8 +2,8 @@ import { NGROK_HOST } from "@env";
 import TokenStorage from "./services/storage/tokenStorage";
 import { defaultHeaders, fileUploadHeaders, handleResponse } from "./defaults";
 
-const baseURL = NGROK_HOST || "http://localhost:3001";
-const MAX_RETRIES = 3;
+const baseURL = NGROK_HOST || "http://localhost:3000"; // ← Cambiado a 3000 para coincidir con backend
+const MAX_RETRIES = 2; // ← Reducir reintentos para evitar bucles largos
 const RETRY_DELAY = 1000;
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -55,7 +55,7 @@ export const httpFetch = async (
     const response = await fetch(url, config);
 
     if (!response.ok) {
-      }
+    }
 
     const result = await handleResponse(response);
     return result;

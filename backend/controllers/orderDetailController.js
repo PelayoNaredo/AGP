@@ -1,9 +1,12 @@
 import pool from "../db.js";
 
-// Obtener todos los detalles de órdenes
+// Obtener todos los detalles de órdenes (filtrados automáticamente por RLS)
 export const getAllOrderDetails = async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM order_detail");
+    // ← CAMBIO: RLS filtra automáticamente por company_id
+    const result = await pool.query(
+      "SELECT * FROM order_detail ORDER BY id_detalle DESC"
+    );
     res.json(result.rows);
   } catch (error) {
     console.error("Error al obtener los detalles de la orden:", error);
@@ -11,10 +14,11 @@ export const getAllOrderDetails = async (req, res) => {
   }
 };
 
-// Obtener un detalle de orden por ID
+// Obtener un detalle de orden por ID (RLS automático)
 export const getOrderDetailById = async (req, res) => {
   const { id } = req.params;
   try {
+    // ← CAMBIO: RLS garantiza que solo se vean detalles de órdenes de la empresa actual
     const result = await pool.query(
       "SELECT * FROM order_detail WHERE id_detalle = $1",
       [id]
@@ -31,14 +35,15 @@ export const getOrderDetailById = async (req, res) => {
   }
 };
 
-// Crear un nuevo detalle de orden
+// Crear un nuevo detalle de orden (ahora incluye company_id automáticamente)
 export const createOrderDetail = async (req, res) => {
   const { id_pedido, id_producto, cantidad, precio_unitario } = req.body;
   try {
+    // ← CAMBIO: Incluir company_id del contexto de tenant
     const result = await pool.query(
-      `INSERT INTO order_detail (id_pedido, id_producto, cantidad, precio_unitario)
-             VALUES ($1, $2, $3, $4) RETURNING *`,
-      [id_pedido, id_producto, cantidad, precio_unitario]
+      `INSERT INTO order_detail (company_id, id_pedido, id_producto, cantidad, precio_unitario)
+             VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [req.companyId, id_pedido, id_producto, cantidad, precio_unitario]
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {

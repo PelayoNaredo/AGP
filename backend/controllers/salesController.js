@@ -1,8 +1,9 @@
 import pool from "../db.js";
 
-// Obtener todas las ventas
+// Obtener todas las ventas (filtradas automáticamente por RLS)
 export const getAllSales = async (req, res) => {
   try {
+    // ← CAMBIO: RLS filtra automáticamente tanto sales como clients por company_id
     const result = await pool.query(`
       SELECT s.*, 
              c.nombre as nombre_cliente, c.apellido as apellido_cliente,
@@ -18,7 +19,7 @@ export const getAllSales = async (req, res) => {
   }
 };
 
-// Obtener venta por ID con detalles
+// Obtener venta por ID con detalles (RLS automático)
 export const getSaleById = async (req, res) => {
   const { id } = req.params;
 
@@ -29,6 +30,7 @@ export const getSaleById = async (req, res) => {
   const client = await pool.connect();
 
   try {
+    // ← CAMBIO: RLS garantiza que solo se vean ventas y clientes de la empresa actual
     // Obtener información de la venta con campos fiscales
     const saleQuery = await client.query(
       `
@@ -224,18 +226,20 @@ export const createSale = async (req, res) => {
     const totalFinal = parseFloat(totalCalculado.toFixed(2));
 
     try {
+      // ← CAMBIO: Incluir company_id del contexto de tenant
       // Insertar la venta principal con campos fiscales
       const saleResult = await client.query(
         `
         INSERT INTO sales (
-          numero_documento, tipo_documento, fecha_emision, id_cliente, 
+          company_id, numero_documento, tipo_documento, fecha_emision, id_cliente, 
           tipo_iva, porcentaje_iva, porcentaje_retencion,
           subtotal, descuento, impuestos, total, 
           metodo_pago, estado, notas
-        ) VALUES ($1, $2, CURRENT_TIMESTAMP, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        ) VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         RETURNING *
       `,
         [
+          req.companyId, // ← NUEVO: company_id del middleware tenantContext
           numero_documento,
           tipo_documento,
           id_cliente || null, // Asegurar explícitamente NULL para ventas sin cliente

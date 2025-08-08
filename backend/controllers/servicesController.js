@@ -1,8 +1,9 @@
 import pool from "../db.js";
 
-// Obtener todos los servicios
+// Obtener todos los servicios activos (filtrados automáticamente por RLS)
 export const getAllServices = async (req, res) => {
   try {
+    // ← CAMBIO: RLS filtra automáticamente por company_id
     const result = await pool.query(`
       SELECT * FROM services
       WHERE activo = true
@@ -15,9 +16,10 @@ export const getAllServices = async (req, res) => {
   }
 };
 
-// Obtener todos los servicios (incluyendo inactivos)
+// Obtener todos los servicios incluyendo inactivos (RLS automático)
 export const getAllServicesAdmin = async (req, res) => {
   try {
+    // ← CAMBIO: RLS filtra automáticamente por company_id
     const result = await pool.query(`
       SELECT * FROM services
       ORDER BY nombre_servicio
@@ -29,7 +31,7 @@ export const getAllServicesAdmin = async (req, res) => {
   }
 };
 
-// Obtener servicio por ID
+// Obtener servicio por ID (RLS automático)
 export const getServiceById = async (req, res) => {
   const { id } = req.params;
 
@@ -125,17 +127,18 @@ export const createService = async (req, res) => {
 
   try {
     await client.query("BEGIN");
-
+    // ← CAMBIO: Incluir company_id del contexto de tenant
     // Insertar el servicio base
     const serviceResult = await client.query(
       `
       INSERT INTO services (
-        nombre_servicio, descripcion, precio_base, tipo_tarifa,
+        company_id, nombre_servicio, descripcion, precio_base, tipo_tarifa,
         duracion_estimada_minutos, categoria, requiere_profesional, activo
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
     `,
       [
+        req.companyId, // ← NUEVO: company_id del middleware tenantContext
         nombre_servicio,
         descripcion || null,
         precio_base || null,

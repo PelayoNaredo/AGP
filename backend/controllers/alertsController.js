@@ -1,8 +1,9 @@
 import pool from "../db.js";
 
-// Obtener todas las alertas
+// Obtener todas las alertas (filtradas automáticamente por RLS)
 export const getAlerts = async (req, res) => {
   try {
+    // ← CAMBIO: RLS filtra automáticamente por company_id
     const result = await pool.query(
       "SELECT * FROM alerts ORDER BY fecha_recordatorio DESC"
     );
@@ -13,10 +14,11 @@ export const getAlerts = async (req, res) => {
   }
 };
 
-// Obtener una alerta por ID
+// Obtener una alerta por ID (RLS automático)
 export const getAlertById = async (req, res) => {
   const { id } = req.params;
   try {
+    // ← CAMBIO: RLS garantiza que solo se vean alertas de la empresa actual
     const result = await pool.query(
       "SELECT * FROM alerts WHERE id_recordatorio = $1",
       [id]
@@ -30,22 +32,31 @@ export const getAlertById = async (req, res) => {
   }
 };
 
-// Crear nueva alerta
+// Crear nueva alerta (ahora incluye company_id automáticamente)
 export const createAlert = async (req, res) => {
   const { titulo, descripcion, fecha_recordatorio, estado, tipo, prioridad } =
     req.body;
 
   try {
+    // ← CAMBIO: Incluir company_id del contexto de tenant
     const result = await pool.query(
       `INSERT INTO alerts (
-        titulo, 
+        company_id, titulo, 
         descripcion, 
         fecha_recordatorio, 
         estado, 
         tipo, 
         prioridad
-      ) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [titulo, descripcion, fecha_recordatorio, estado, tipo, prioridad]
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [
+        req.companyId,
+        titulo,
+        descripcion,
+        fecha_recordatorio,
+        estado,
+        tipo,
+        prioridad,
+      ]
     );
 
     res.status(201).json(result.rows[0]);

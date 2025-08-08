@@ -1,9 +1,12 @@
 import pool from "../db.js";
 
-// Obtener todos los proveedores
+// Obtener todos los proveedores (filtrados automáticamente por RLS)
 export const getSuppliers = async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM suppliers");
+    // ← CAMBIO: RLS filtra automáticamente por company_id
+    const result = await pool.query(
+      "SELECT * FROM suppliers ORDER BY nombre_proveedor"
+    );
     res.status(200).json(result.rows);
   } catch (err) {
     console.error("Error al obtener proveedores:", err);
@@ -11,10 +14,11 @@ export const getSuppliers = async (req, res) => {
   }
 };
 
-// Obtener un proveedor por ID
+// Obtener un proveedor por ID (RLS automático)
 export const getSupplierById = async (req, res) => {
   const { id } = req.params;
   try {
+    // ← CAMBIO: RLS garantiza que solo se vean proveedores de la empresa actual
     const result = await pool.query(
       "SELECT * FROM suppliers WHERE id_proveedor = $1",
       [id]
@@ -29,7 +33,7 @@ export const getSupplierById = async (req, res) => {
   }
 };
 
-// Crear un nuevo proveedor
+// Crear un nuevo proveedor (ahora incluye company_id automáticamente)
 export const createSupplier = async (req, res) => {
   const {
     nombre_proveedor,
@@ -61,14 +65,16 @@ export const createSupplier = async (req, res) => {
         .json({ message: "Días de crédito debe ser un número entero" });
     }
 
+    // ← CAMBIO: Incluir company_id del contexto de tenant
     const result = await pool.query(
       `INSERT INTO suppliers (
-        nombre_proveedor, contacto, telefono, email, plantilla_email,
+        company_id, nombre_proveedor, contacto, telefono, email, plantilla_email,
         direccion_fiscal, cif, condiciones_pago, dias_credito,
         cuenta_bancaria, moneda, sitio_web, activo
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING *`,
       [
+        req.companyId, // ← NUEVO: company_id del middleware tenantContext
         nombre_proveedor,
         contacto,
         telefono,

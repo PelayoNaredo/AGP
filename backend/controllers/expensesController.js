@@ -1,6 +1,6 @@
 import pool from "../db.js"; // importamos la conexion a la bd
 
-// Obtener gastos con paginación y búsqueda
+// Obtener gastos con paginación y búsqueda (filtrados automáticamente por RLS)
 export const getExpenses = async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 50;
@@ -8,6 +8,7 @@ export const getExpenses = async (req, res) => {
   const offset = (page - 1) * limit;
 
   try {
+    // ← CAMBIO: RLS filtra automáticamente por company_id
     // Consulta para obtener el total de registros
     const countQuery = await pool.query(
       `SELECT COUNT(*) FROM expenses 
@@ -85,14 +86,15 @@ export const getExpenseById = async (req, res) => {
   }
 };
 
-// Crear un nuevo gasto
+// Crear un nuevo gasto (ahora incluye company_id automáticamente)
 export const createExpense = async (req, res) => {
   const { tipo_gasto, concepto, monto, fecha_gasto, comentarios } = req.body;
   try {
+    // ← CAMBIO: Incluir company_id del contexto de tenant
     const result = await pool.query(
-      "INSERT INTO expenses (tipo_gasto, concepto, monto, fecha_gasto, comentarios) " +
-        "VALUES ($1, $2, $3, $4, $5) RETURNING *",
-      [tipo_gasto, concepto, monto, fecha_gasto, comentarios]
+      "INSERT INTO expenses (company_id, tipo_gasto, concepto, monto, fecha_gasto, comentarios) " +
+        "VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+      [req.companyId, tipo_gasto, concepto, monto, fecha_gasto, comentarios] // ← NUEVO: company_id
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
