@@ -1,0 +1,864 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getUserAndCompanyId } from "../_shared/auth-utils.ts";
+import { withCors, createCorsJsonResponse, createCorsErrorResponse } from "../_shared/cors.ts";
+
+// Configuración de Supabase
+const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+
+// Función para validar datos de producto del inventario
+function validateInventoryData(data: any, isUpdate = false): string[] {
+  const errors: string[] = [];
+
+  // Campos obligatorios en creación
+  if (!isUpdate) {
+    if (!data.nombre_producto) {
+      errors.push("nombre_producto es obligatorio");
+    }
+    if (data.precio_unitario === undefined || data.precio_unitario === null) {
+      errors.push("precio_unitario es obligatorio");
+    }
+  }
+
+  // Validación de nombre del producto
+  if (
+    data.nombre_producto &&
+    (typeof data.nombre_producto !== "string" ||
+      data.nombre_producto.trim().length === 0)
+  ) {
+    errors.push("nombre_producto debe ser un texto válido");
+  }
+
+  if (data.nombre_producto && data.nombre_producto.length > 200) {
+    errors.push("nombre_producto no puede exceder 200 caracteres");
+  }
+
+  // Validación de precio unitario
+  if (
+    data.precio_unitario !== undefined &&
+    (isNaN(parseFloat(data.precio_unitario)) ||
+      parseFloat(data.precio_unitario) < 0)
+  ) {
+    errors.push("precio_unitario debe ser un número positivo");
+  }
+
+  // Validación de cantidades
+  if (
+    data.cantidad_actual !== undefined &&
+    (isNaN(parseInt(data.cantidad_actual)) ||
+      parseInt(data.cantidad_actual) < 0)
+  ) {
+    errors.push("cantidad_actual debe ser un número entero positivo");
+  }
+
+  if (
+    data.cantidad_minima !== undefined &&
+    (isNaN(parseInt(data.cantidad_minima)) ||
+      parseInt(data.cantidad_minima) < 0)
+  ) {
+    errors.push("cantidad_minima debe ser un número entero positivo");
+  }
+
+  if (
+    data.cantidad_maxima !== undefined &&
+    data.cantidad_maxima !== null &&
+    (isNaN(parseInt(data.cantidad_maxima)) ||
+      parseInt(data.cantidad_maxima) < 0)
+  ) {
+    errors.push("cantidad_maxima debe ser un número entero positivo");
+  }
+
+  // Validación de categoría
+  if (data.categoria && data.categoria.length > 100) {
+    errors.push("categoria no puede exceder 100 caracteres");
+  }
+
+  // Validación de código/SKU
+  if (data.codigo && data.codigo.length > 50) {
+    errors.push("codigo no puede exceder 50 caracteres");
+  }
+
+  // Validación de ubicación
+  if (data.ubicacion && data.ubicacion.length > 100) {
+    errors.push("ubicacion no puede exceder 100 caracteres");
+  }
+
+  return errors;
+}
+
+async function handleSecureRoute(req: Request) {
+  const url = new URL(req.url);
+  const pathSegments = url.pathname.split("/").filter((segment) => segment);
+  const searchParams = url.searchParams;
+
+  // Autenticación y autorización
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader) {
+    return createCorsErrorResponse("Token de autorización requerido", 401);
+  }
+
+  const { companyId, error: authError } = await getUserAndCompanyId(
+    authHeader.replace("Bearer ", "")
+  );
+  if (authError || !companyId) {
+    return new Response(
+      JSON.stringify({
+        error: authError || "Company ID no encontrado en el token",
+      }),
+      {
+        status: 401,
+
+      }
+    );
+  }
+
+  // Rutas para inventory
+  if (req.method === "GET") {
+    // GET /inventory?category=electronics - Obtener productos por categoría
+    if (pathSegments.length === 0 && searchParams.has("category")) {
+      const category = searchParams.get("category")!;
+
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("inventory")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("categoria", category)
+          .order("nombre_producto", { ascending: true });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener productos por categoría:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener productos por categoría",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /inventory?search=nombre - Buscar productos
+    if (pathSegments.length === 0 && searchParams.has("search")) {
+      const searchTerm = searchParams.get("search")!;
+
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("inventory")
+          .select("*")
+          .eq("company_id", companyId)
+          .or(
+            `nombre_producto.ilike.%${searchTerm}%,descripcion.ilike.%${searchTerm}%,codigo.ilike.%${searchTerm}%`
+          )
+          .order("nombre_producto", { ascending: true });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al buscar productos:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al buscar productos",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /inventory/low-stock - Obtener productos con stock bajo
+    if (pathSegments.length === 1 && pathSegments[0] === "low-stock") {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("inventory")
+          .select("*")
+          .eq("company_id", companyId)
+          .filter("cantidad_actual", "lte", "cantidad_minima")
+          .order("cantidad_actual", { ascending: true });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener productos con stock bajo:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener productos con stock bajo",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /inventory/out-of-stock - Obtener productos agotados
+    if (pathSegments.length === 1 && pathSegments[0] === "out-of-stock") {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("inventory")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("cantidad_actual", 0)
+          .order("nombre_producto", { ascending: true });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener productos agotados:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener productos agotados",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /inventory/categories - Obtener lista de categorías
+    if (pathSegments.length === 1 && pathSegments[0] === "categories") {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("inventory")
+          .select("categoria")
+          .eq("company_id", companyId)
+          .not("categoria", "is", null);
+
+        if (error) throw error;
+
+        // Obtener categorías únicas
+        const uniqueCategories = [
+          ...new Set(data.map((item) => item.categoria)),
+        ];
+
+        return createCorsJsonResponse(uniqueCategories, 200);
+      } catch (error: any) {
+        console.error("Error al obtener categorías:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener categorías",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /inventory/stats - Obtener estadísticas del inventario
+    if (pathSegments.length === 1 && pathSegments[0] === "stats") {
+      try {
+        const { data: inventoryData, error } = await supabaseAdmin
+          .from("inventory")
+          .select(
+            "cantidad_actual, cantidad_minima, precio_unitario, categoria"
+          )
+          .eq("company_id", companyId);
+
+        if (error) throw error;
+
+        // Procesar estadísticas
+        const stats = {
+          general: {
+            total_productos: inventoryData.length,
+            valor_total_inventario: 0,
+            productos_agotados: 0,
+            productos_stock_bajo: 0,
+            productos_stock_adecuado: 0,
+          },
+          por_categoria: {} as any,
+          estado_stock: {
+            agotado: 0,
+            critico: 0,
+            bajo: 0,
+            adecuado: 0,
+            excedente: 0,
+          },
+        };
+
+        inventoryData.forEach((product) => {
+          const cantidad = product.cantidad_actual || 0;
+          const minima = product.cantidad_minima || 0;
+          const precio = parseFloat(product.precio_unitario || "0");
+          const categoria = product.categoria || "sin_categoria";
+
+          // Calcular valor total
+          stats.general.valor_total_inventario += cantidad * precio;
+
+          // Clasificar estado del stock
+          let estadoStock = "adecuado";
+          if (cantidad === 0) {
+            estadoStock = "agotado";
+            stats.general.productos_agotados++;
+          } else if (cantidad <= minima * 0.2) {
+            estadoStock = "critico";
+            stats.general.productos_stock_bajo++;
+          } else if (cantidad <= minima) {
+            estadoStock = "bajo";
+            stats.general.productos_stock_bajo++;
+          } else if (cantidad <= minima * 1.5) {
+            estadoStock = "adecuado";
+            stats.general.productos_stock_adecuado++;
+          } else {
+            estadoStock = "excedente";
+            stats.general.productos_stock_adecuado++;
+          }
+
+          stats.estado_stock[estadoStock as keyof typeof stats.estado_stock]++;
+
+          // Agrupar por categoría
+          if (!stats.por_categoria[categoria]) {
+            stats.por_categoria[categoria] = {
+              cantidad_productos: 0,
+              valor_total: 0,
+              productos_agotados: 0,
+              productos_stock_bajo: 0,
+            };
+          }
+
+          stats.por_categoria[categoria].cantidad_productos++;
+          stats.por_categoria[categoria].valor_total += cantidad * precio;
+
+          if (cantidad === 0) {
+            stats.por_categoria[categoria].productos_agotados++;
+          } else if (cantidad <= minima) {
+            stats.por_categoria[categoria].productos_stock_bajo++;
+          }
+        });
+
+        return createCorsJsonResponse(stats, 200);
+      } catch (error: any) {
+        console.error("Error al obtener estadísticas:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener estadísticas",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /inventory - Obtener todos los productos
+    if (pathSegments.length === 0) {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("inventory")
+          .select("*")
+          .eq("company_id", companyId)
+          .order("nombre_producto", { ascending: true });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener inventario:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener inventario",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /inventory/:id - Obtener producto por ID
+    if (
+      pathSegments.length === 1 &&
+      !["low-stock", "out-of-stock", "categories", "stats"].includes(
+        pathSegments[0]
+      )
+    ) {
+      const productId = pathSegments[0];
+
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("inventory")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("id_producto", productId)
+          .single();
+
+        if (error) {
+          if (error.code === "PGRST116") {
+            return createCorsErrorResponse("Producto no encontrado", 404);
+          }
+          throw error;
+        }
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener producto:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener producto",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+  }
+
+  if (req.method === "POST") {
+    // POST /inventory - Crear nuevo producto
+    if (pathSegments.length === 0) {
+      try {
+        const productData = await req.json();
+
+        // Validar datos
+        const validationErrors = validateInventoryData(productData);
+        if (validationErrors.length > 0) {
+          return new Response(
+            JSON.stringify({
+              error: "Datos inválidos",
+              details: validationErrors,
+            }),
+            {
+              status: 400,
+
+            }
+          );
+        }
+
+        // Verificar que el código no esté en uso en la empresa (si se proporciona)
+        if (productData.codigo) {
+          const { data: existingProduct } = await supabaseAdmin
+            .from("inventory")
+            .select("id_producto")
+            .eq("company_id", companyId)
+            .eq("codigo", productData.codigo)
+            .single();
+
+          if (existingProduct) {
+            return new Response(
+              JSON.stringify({
+                error: "Ya existe un producto con este código en la empresa",
+              }),
+              {
+                status: 400,
+
+              }
+            );
+          }
+        }
+
+        // Preparar datos para inserción
+        const insertData = {
+          company_id: companyId,
+          nombre_producto: productData.nombre_producto,
+          descripcion: productData.descripcion || null,
+          codigo: productData.codigo || null,
+          categoria: productData.categoria || null,
+          precio_unitario: parseFloat(productData.precio_unitario),
+          cantidad_actual: parseInt(productData.cantidad_actual || "0"),
+          cantidad_minima: parseInt(productData.cantidad_minima || "0"),
+          cantidad_maxima: productData.cantidad_maxima
+            ? parseInt(productData.cantidad_maxima)
+            : null,
+          ubicacion: productData.ubicacion || null,
+          proveedor: productData.proveedor || null,
+          fecha_ultima_compra: productData.fecha_ultima_compra || null,
+          fecha_vencimiento: productData.fecha_vencimiento || null,
+          activo: productData.activo !== undefined ? productData.activo : true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        const { data, error } = await supabaseAdmin
+          .from("inventory")
+          .insert(insertData)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 201);
+      } catch (error: any) {
+        console.error("Error al crear producto:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al crear producto",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // POST /inventory/:id/adjust - Ajustar stock de producto
+    if (pathSegments.length === 2 && pathSegments[1] === "adjust") {
+      const productId = pathSegments[0];
+
+      try {
+        const { cantidad, tipo, motivo } = await req.json();
+
+        if (!cantidad || !tipo) {
+          return createCorsErrorResponse("cantidad y tipo son obligatorios", 400);
+        }
+
+        const tiposValidos = ["entrada", "salida", "ajuste"];
+        if (!tiposValidos.includes(tipo)) {
+          return new Response(
+            JSON.stringify({
+              error: `tipo debe ser uno de: ${tiposValidos.join(", ")}`,
+            }),
+            {
+              status: 400,
+
+            }
+          );
+        }
+
+        // Verificar que el producto existe y pertenece a la empresa
+        const { data: existingProduct } = await supabaseAdmin
+          .from("inventory")
+          .select("id_producto, cantidad_actual")
+          .eq("company_id", companyId)
+          .eq("id_producto", productId)
+          .single();
+
+        if (!existingProduct) {
+          return createCorsErrorResponse("Producto no encontrado", 404);
+        }
+
+        // Calcular nueva cantidad
+        let nuevaCantidad = existingProduct.cantidad_actual;
+        const cantidadAjuste = parseInt(cantidad);
+
+        switch (tipo) {
+          case "entrada":
+            nuevaCantidad += cantidadAjuste;
+            break;
+          case "salida":
+            nuevaCantidad -= cantidadAjuste;
+            break;
+          case "ajuste":
+            nuevaCantidad = cantidadAjuste;
+            break;
+        }
+
+        // Verificar que la cantidad no sea negativa
+        if (nuevaCantidad < 0) {
+          return new Response(
+            JSON.stringify({
+              error: "La cantidad resultante no puede ser negativa",
+            }),
+            {
+              status: 400,
+
+            }
+          );
+        }
+
+        // Actualizar el inventario
+        const { data, error } = await supabaseAdmin
+          .from("inventory")
+          .update({
+            cantidad_actual: nuevaCantidad,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id_producto", productId)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // Registrar el movimiento de inventario (opcional, si tienes esa tabla)
+        // await supabaseAdmin
+        //   .from("inventory_movements")
+        //   .insert({
+        //     company_id: companyId,
+        //     producto_id: productId,
+        //     tipo_movimiento: tipo,
+        //     cantidad: cantidadAjuste,
+        //     cantidad_anterior: existingProduct.cantidad_actual,
+        //     cantidad_nueva: nuevaCantidad,
+        //     motivo: motivo || null,
+        //     created_at: new Date().toISOString(),
+        //   });
+
+        return new Response(
+          JSON.stringify({
+            message: "Stock ajustado correctamente",
+            product: data,
+            movement: {
+              tipo,
+              cantidad: cantidadAjuste,
+              cantidad_anterior: existingProduct.cantidad_actual,
+              cantidad_nueva: nuevaCantidad,
+            },
+          }),
+          {
+            status: 200,
+
+          }
+        );
+      } catch (error: any) {
+        console.error("Error al ajustar stock:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al ajustar stock",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+  }
+
+  if (req.method === "PUT") {
+    // PUT /inventory/:id - Actualizar producto
+    if (pathSegments.length === 1) {
+      const productId = pathSegments[0];
+
+      try {
+        const productData = await req.json();
+
+        // Validar datos
+        const validationErrors = validateInventoryData(productData, true);
+        if (validationErrors.length > 0) {
+          return new Response(
+            JSON.stringify({
+              error: "Datos inválidos",
+              details: validationErrors,
+            }),
+            {
+              status: 400,
+
+            }
+          );
+        }
+
+        // Verificar que el producto existe y pertenece a la empresa
+        const { data: existingProduct } = await supabaseAdmin
+          .from("inventory")
+          .select("id_producto, codigo")
+          .eq("company_id", companyId)
+          .eq("id_producto", productId)
+          .single();
+
+        if (!existingProduct) {
+          return createCorsErrorResponse("Producto no encontrado", 404);
+        }
+
+        // Si se actualiza el código, verificar que no esté en uso por otro producto
+        if (
+          productData.codigo &&
+          productData.codigo !== existingProduct.codigo
+        ) {
+          const { data: codeInUse } = await supabaseAdmin
+            .from("inventory")
+            .select("id_producto")
+            .eq("company_id", companyId)
+            .eq("codigo", productData.codigo)
+            .neq("id_producto", productId)
+            .single();
+
+          if (codeInUse) {
+            return new Response(
+              JSON.stringify({
+                error: "Este código ya está en uso por otro producto",
+              }),
+              {
+                status: 400,
+
+              }
+            );
+          }
+        }
+
+        // Preparar datos para actualización
+        const updateData: any = {
+          updated_at: new Date().toISOString(),
+        };
+
+        if (productData.nombre_producto !== undefined) {
+          updateData.nombre_producto = productData.nombre_producto;
+        }
+        if (productData.descripcion !== undefined) {
+          updateData.descripcion = productData.descripcion || null;
+        }
+        if (productData.codigo !== undefined) {
+          updateData.codigo = productData.codigo || null;
+        }
+        if (productData.categoria !== undefined) {
+          updateData.categoria = productData.categoria || null;
+        }
+        if (productData.precio_unitario !== undefined) {
+          updateData.precio_unitario = parseFloat(productData.precio_unitario);
+        }
+        if (productData.cantidad_actual !== undefined) {
+          updateData.cantidad_actual = parseInt(productData.cantidad_actual);
+        }
+        if (productData.cantidad_minima !== undefined) {
+          updateData.cantidad_minima = parseInt(productData.cantidad_minima);
+        }
+        if (productData.cantidad_maxima !== undefined) {
+          updateData.cantidad_maxima = productData.cantidad_maxima
+            ? parseInt(productData.cantidad_maxima)
+            : null;
+        }
+        if (productData.ubicacion !== undefined) {
+          updateData.ubicacion = productData.ubicacion || null;
+        }
+        if (productData.proveedor !== undefined) {
+          updateData.proveedor = productData.proveedor || null;
+        }
+        if (productData.fecha_ultima_compra !== undefined) {
+          updateData.fecha_ultima_compra =
+            productData.fecha_ultima_compra || null;
+        }
+        if (productData.fecha_vencimiento !== undefined) {
+          updateData.fecha_vencimiento = productData.fecha_vencimiento || null;
+        }
+        if (productData.activo !== undefined) {
+          updateData.activo = productData.activo;
+        }
+
+        const { data, error } = await supabaseAdmin
+          .from("inventory")
+          .update(updateData)
+          .eq("id_producto", productId)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al actualizar producto:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al actualizar producto",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+  }
+
+  if (req.method === "DELETE") {
+    // DELETE /inventory/:id - Eliminar producto
+    if (pathSegments.length === 1) {
+      const productId = pathSegments[0];
+
+      try {
+        // Verificar que el producto existe y pertenece a la empresa
+        const { data: existingProduct } = await supabaseAdmin
+          .from("inventory")
+          .select("id_producto")
+          .eq("company_id", companyId)
+          .eq("id_producto", productId)
+          .single();
+
+        if (!existingProduct) {
+          return createCorsErrorResponse("Producto no encontrado", 404);
+        }
+
+        // En lugar de eliminar completamente, marcar como inactivo
+        const { data, error } = await supabaseAdmin
+          .from("inventory")
+          .update({
+            activo: false,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id_producto", productId)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        return new Response(
+          JSON.stringify({
+            message: "Producto marcado como inactivo correctamente",
+            product: data,
+          }),
+          {
+            status: 200,
+
+          }
+        );
+      } catch (error: any) {
+        console.error("Error al desactivar producto:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al desactivar producto",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+  }
+
+  // Ruta no encontrada
+  return createCorsErrorResponse("Endpoint no encontrado", 404);
+}
+
+serve(withCors(async (req) => {
+  // Manejar preflight CORS
+  if (req.method === "OPTIONS") {
+    return new Response("ok");
+  }
+
+  try {
+    return await handleSecureRoute(req);
+  } catch (error: any) {
+    console.error("Error en inventory EdgeFunction:", error);
+    return new Response(
+      JSON.stringify({
+        error: "Error interno del servidor",
+        details: error.message,
+      }),
+      {
+        status: 500,
+
+      }
+    );
+  }
+});

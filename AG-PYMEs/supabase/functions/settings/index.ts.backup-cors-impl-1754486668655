@@ -1,0 +1,369 @@
+/**
+ * 🚀 Edge Function: Settings Controller (Enterprise Template)
+ *
+ * Fecha: 2 de agosto de 2025
+ * FASE 3: Arquitectura empresarial unificada
+ *
+ * CARACTERÍSTICAS:
+ * ✅ Enterprise template con funciones nativas DB
+ * ✅ Autenticación con auth.uid() y auth.email()
+ * ✅ RLS automático con set_current_company_id()
+ * ✅ Límites de empresa con check_company_limits()
+ * ✅ Auditoría con get_company_usage_stats()
+ */
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createEnterpriseHandler } from "../_shared/enterprise-template.ts";
+
+// Theme options constants
+const THEME_OPTIONS = ["default", "light", "dark", "modern", "classic"];
+
+// 🚀 Enterprise Handler: Settings Management
+serve(
+  createEnterpriseHandler(async ({ supabase, authData, url, method, body }) => {
+    let pathname = url.pathname;
+
+    // Handle different path scenarios
+    if (pathname.startsWith("/functions/v1/settings")) {
+      pathname = pathname.replace("/functions/v1/settings", "");
+    }
+    if (pathname === "/settings") {
+      pathname = "/";
+    } else if (pathname.startsWith("/settings/")) {
+      pathname = pathname.replace("/settings", "");
+    }
+    if (pathname === "" || pathname === "/") {
+      pathname = "/";
+    }
+
+    console.log(`🔍 ${method} ${pathname} (original: ${url.pathname})`);
+
+    // Routing
+    if (method === "GET" && pathname === "/") {
+      return await getCompanySettings(supabase, authData);
+    }
+
+    if (method === "GET" && pathname.match(/^\/[0-9a-f-]{36}$/i)) {
+      const settingId = pathname.substring(1);
+      return await getSettingById(supabase, authData, settingId);
+    }
+
+    if (method === "POST" && pathname === "/") {
+      return await createSetting(supabase, authData, body);
+    }
+
+    if (method === "PUT" && pathname.match(/^\/[0-9a-f-]{36}$/i)) {
+      const settingId = pathname.substring(1);
+      return await updateSetting(supabase, authData, settingId, body);
+    }
+
+    if (method === "POST" && pathname === "/logo") {
+      const req = body as Request; // Para manejar FormData
+      return await updateSettingLogo(supabase, authData, req);
+    }
+
+    throw new Error("Route not found");
+  })
+);
+
+/**
+ * ⚙️ Obtener configuraciones de la empresa
+ */
+async function getCompanySettings(supabase: any, authData: any) {
+  const { data, error } = await supabase
+    .from("settings")
+    .select("*")
+    .eq("company_id", authData.company_id)
+    .limit(1)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") {
+      // Si no hay configuraciones, devolver configuraciones por defecto
+      return {
+        nombre_local: null,
+        direccion: null,
+        telefono: null,
+        url_backend: null,
+        horario_apertura: null,
+        horario_cierre: null,
+        logo_local: null,
+        tema: "default",
+      };
+    }
+    throw error;
+  }
+
+  return data;
+}
+
+/**
+ * 🔍 Obtener configuración por ID
+ */
+async function getSettingById(supabase: any, authData: any, settingId: string) {
+  if (!isValidUUID(settingId)) {
+    throw new Error("Invalid setting ID");
+  }
+
+  const { data, error } = await supabase
+    .from("settings")
+    .select("*")
+    .eq("id", settingId)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") {
+      throw new Error("Setting not found");
+    }
+    throw error;
+  }
+
+  return data;
+}
+
+/**
+ * ➕ Crear nueva configuración
+ */
+async function createSetting(supabase: any, authData: any, settingData: any) {
+  // Validar datos de configuración
+  const validationErrors = validateSettingData(settingData, false);
+  if (validationErrors.length > 0) {
+    throw new Error(validationErrors[0]);
+  }
+
+  const insertData = {
+    ...settingData,
+    company_id: authData.company_id,
+    tema: settingData.tema || "default",
+  };
+
+  const { data, error } = await supabase
+    .from("settings")
+    .insert(insertData)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+/**
+ * ✏️ Actualizar configuración
+ */
+async function updateSetting(
+  supabase: any,
+  authData: any,
+  settingId: string,
+  updateData: any
+) {
+  if (!isValidUUID(settingId)) {
+    throw new Error("Invalid setting ID");
+  }
+
+  // Validar datos de actualización
+  const validationErrors = validateSettingData(updateData, true);
+  if (validationErrors.length > 0) {
+    throw new Error(validationErrors[0]);
+  }
+
+  const { data, error } = await supabase
+    .from("settings")
+    .update(updateData)
+    .eq("id", settingId)
+    .select("*")
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") {
+      throw new Error("Setting not found");
+    }
+    throw error;
+  }
+
+  return data;
+}
+
+/**
+ * 🖼️ Actualizar logo de configuración
+ */
+async function updateSettingLogo(supabase: any, authData: any, req: Request) {
+  const formData = await req.formData();
+  const file = formData.get("logo") as File;
+
+  if (!file) {
+    throw new Error("No file uploaded");
+  }
+
+  // Validar archivo
+  validateLogoFile(file);
+
+  // Obtener configuraciones actuales para logo existente
+  const { data: currentSettings } = await supabase
+    .from("settings")
+    .select("logo_local")
+    .eq("company_id", authData.company_id)
+    .limit(1)
+    .single();
+
+  // Generar nombre único para el archivo
+  const filename = `${generateUUID()}-${file.name}`;
+  const filePath = `${authData.company_id}/${filename}`;
+
+  // Subir archivo a Supabase Storage
+  const { data: uploadData, error: uploadError } = await supabase.storage
+    .from("company-logos")
+    .upload(filePath, file, {
+      contentType: file.type,
+      upsert: true,
+    });
+
+  if (uploadError) {
+    throw new Error("Error uploading file");
+  }
+
+  // Obtener URL pública
+  const { data: publicUrlData } = supabase.storage
+    .from("company-logos")
+    .getPublicUrl(uploadData.path);
+
+  const logoUrl = publicUrlData.publicUrl;
+
+  // Actualizar configuraciones con nueva URL de logo
+  const { data, error } = await supabase
+    .from("settings")
+    .upsert({
+      company_id: authData.company_id,
+      logo_local: logoUrl,
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error("Error updating logo");
+  }
+
+  // Eliminar logo anterior si existe
+  if (currentSettings?.logo_local) {
+    try {
+      const oldPath = currentSettings.logo_local.split("/company-logos/")[1];
+      if (oldPath) {
+        await supabase.storage.from("company-logos").remove([oldPath]);
+      }
+    } catch (deleteError) {
+      console.error("Error deleting previous logo:", deleteError);
+    }
+  }
+
+  return {
+    message: "Logo updated successfully",
+    url: logoUrl,
+    path: uploadData.path,
+  };
+}
+
+// Utility functions
+function isValidUUID(uuid: string): boolean {
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+}
+
+function generateUUID(): string {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c == "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+function validateSettingData(data: any, isUpdate = false): string[] {
+  const errors: string[] = [];
+
+  // Validar nombre_local (requerido para crear, opcional para actualizar)
+  if (!isUpdate && (!data.nombre_local || data.nombre_local.trim() === "")) {
+    errors.push("Nombre del local es requerido");
+  } else if (data.nombre_local && data.nombre_local.length > 100) {
+    errors.push("Nombre del local es demasiado largo");
+  }
+
+  // Validar dirección (opcional)
+  if (
+    data.direccion !== undefined &&
+    data.direccion !== null &&
+    typeof data.direccion !== "string"
+  ) {
+    errors.push("Dirección debe ser una cadena de texto");
+  }
+
+  // Validar teléfono (opcional pero debe ser formato válido si se proporciona)
+  if (data.telefono !== undefined && data.telefono !== null) {
+    const phoneRegex = /^\+?[0-9]{10,14}$/;
+    if (!phoneRegex.test(data.telefono)) {
+      errors.push("Número de teléfono inválido");
+    }
+  }
+
+  // Validar URL de backend (opcional pero debe ser URL válida si se proporciona)
+  if (data.url_backend !== undefined && data.url_backend !== null) {
+    try {
+      new URL(data.url_backend);
+    } catch {
+      errors.push("URL de backend inválida");
+    }
+  }
+
+  // Validar horario de apertura (opcional pero debe ser formato de hora válido si se proporciona)
+  if (data.horario_apertura !== undefined && data.horario_apertura !== null) {
+    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+    if (!timeRegex.test(data.horario_apertura)) {
+      errors.push("Formato de hora de apertura inválido (HH:MM)");
+    }
+  }
+
+  // Validar horario de cierre (opcional pero debe ser formato de hora válido si se proporciona)
+  if (data.horario_cierre !== undefined && data.horario_cierre !== null) {
+    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+    if (!timeRegex.test(data.horario_cierre)) {
+      errors.push("Formato de hora de cierre inválido (HH:MM)");
+    }
+  }
+
+  // Validar logo local (opcional pero debe ser URL válida si se proporciona)
+  if (data.logo_local !== undefined && data.logo_local !== null) {
+    try {
+      new URL(data.logo_local);
+    } catch {
+      errors.push("URL de logo inválida");
+    }
+  }
+
+  // Validar tema (opcional pero debe ser tema válido si se proporciona)
+  if (data.tema !== undefined && data.tema !== null) {
+    if (!THEME_OPTIONS.includes(data.tema)) {
+      errors.push("Tema inválido");
+    }
+  }
+
+  return errors;
+}
+
+function validateLogoFile(file: File): void {
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+  const ALLOWED_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/svg+xml",
+  ];
+
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    throw new Error("Invalid file type. Allowed types: JPEG, PNG, WebP, SVG");
+  }
+
+  if (file.size > MAX_FILE_SIZE) {
+    throw new Error("File size exceeds 5MB limit");
+  }
+}

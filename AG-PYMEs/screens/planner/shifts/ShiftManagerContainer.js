@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Services } from "../../../api/index";
 import { useUnifiedCache } from "../../../cache/hooks/useUnifiedCache";
+import { normalizeAPIResponse } from "../../../utils/helpers";
 
 // Maneja la lógica de la pantalla de gestión de turnos
 const ShiftManagerContainer = ({ children }) => {
@@ -108,13 +109,17 @@ const ShiftManagerContainer = ({ children }) => {
           getShiftsByDate(dateStr), // Cache de 10 min
         ]);
 
-        const transformedShifts = transformShifts(shiftsData);
+        // Normalizar los datos de empleados
+        const normalizedEmployees = normalizeAPIResponse(employeesData);
+        const normalizedShifts = normalizeAPIResponse(shiftsData);
+
+        const transformedShifts = transformShifts(normalizedShifts);
         const initializedShifts = initializeEmptyShifts(
-          employeesData,
+          normalizedEmployees,
           transformedShifts
         );
 
-        setEmployees(employeesData);
+        setEmployees(normalizedEmployees);
         setShifts(initializedShifts);
       } catch (err) {
         console.error("Error loading shifts data:", err);

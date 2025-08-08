@@ -10,109 +10,217 @@ export const CompanyProvider = ({ children }) => {
   const [usage, setUsage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { user, profile } = useAuth();
+  const auth = useAuth(); // Obtener TODO el contexto de auth
 
-  // Cargar datos de empresa cuando el usuario esté autenticado
+  console.log("🏢 CompanyContext initialized with auth state:", {
+    isAuthenticated: auth.isAuthenticated,
+    user: !!auth.user,
+    loading: auth.loading,
+    company_id: auth.user?.company_id,
+  });
+
+  // Cargar datos de empresa cuando el usuario esté autenticado Y auth context ready
   useEffect(() => {
-    const loadCompanyData = async () => {
-      // Esperar a que tanto user como profile estén disponibles
-      if (!user || !profile?.company_id) {
-        console.log("🏢 No user or company_id, skipping company data load", {
-          user: !!user,
-          profile: !!profile,
-          company_id: profile?.company_id,
-        });
-        setLoading(false);
-        return;
-      }
+    console.log("🏢 CompanyContext useEffect triggered:", {
+      isAuthenticated: auth.isAuthenticated,
+      user: !!auth.user,
+      company_id: auth.user?.company_id,
+      authLoading: auth.loading,
+    });
 
+    // ✅ DEPENDENCY GATES - Esperar a que AuthContext esté completamente listo
+    if (!auth.isAuthenticated) {
+      console.log("🏢 User not authenticated, waiting...");
+      setLoading(false);
+      return;
+    }
+
+    if (!auth.user) {
+      console.log("🏢 User object not ready, waiting...");
+      return; // Wait for complete user object
+    }
+
+    if (auth.loading) {
+      console.log("🏢 AuthContext still loading, waiting...");
+      return; // Wait for AuthContext completion BEFORE checking company_id
+    }
+
+    if (!auth.user.company_id) {
+      console.log("🏢 User without company_id - showing error");
+      setError("Usuario sin empresa asignada");
+      setLoading(false);
+      return;
+    }
+
+    // ✅ NOW SAFE TO PROCEED
+    console.log("🏢 All conditions met, loading company data...");
+    loadCompanyData();
+  }, [auth.isAuthenticated, auth.user, auth.loading]); // Complete dependencies
+
+  const loadCompanyData = async () => {
+    try {
+      console.log("🏢 Loading company data for company:", auth.user.company_id);
+      setLoading(true);
+      setError(null);
+
+      // ✅ USAR NUEVA ENTERPRISE EDGE FUNCTION PARA DATOS DE EMPRESA
       try {
-        console.log("🏢 Loading company data for company:", profile.company_id);
-        setLoading(true);
-        setError(null);
+        console.log("🔄 Getting company data via Enterprise Edge Function...");
 
-        // TEMPORAL: Usar datos por defecto hasta implementar EdgeFunctions de companies
-        console.log(
-          "⚠️ Using default company data (EdgeFunctions not implemented yet)"
+        const response = await fetch(
+          `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/companies/current`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${auth.session.access_token}`,
+              "Content-Type": "application/json",
+              apikey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+            },
+          }
         );
 
-        setCompany({
-          id: profile.company_id,
-          name: "Mi Empresa",
-          subscription_plan: "basic",
-          max_users: 5,
-          max_clients: 100,
-          max_products: 500,
-          max_storage_mb: 1000,
-        });
+        if (response.ok) {
+          const result = await response.json();
 
-        setSettings({
-          company_name: "Mi Empresa",
-          default_currency: "EUR",
-          tax_rate: 21,
-        });
+          // Enterprise template format: { success: true, data: {...} }
+          if (result.success && result.data) {
+            console.log(
+              "✅ Company data loaded via Enterprise Edge Function:",
+              result.data.name
+            );
 
-        setUsage({
-          users: 1,
-          clients: 0,
-          products: 0,
-          storageMB: 0,
-        });
+            setCompany(result.data);
+            setSettings({
+              company_name: result.data.name,
+              default_currency: "EUR",
+              tax_rate: 21,
+            });
+            setUsage({
+              users: 1,
+              clients: 0,
+              products: 0,
+              storageMB: 0,
+            });
 
-        console.log("✅ Default company data loaded");
+            console.log(
+              "✅ Company data loaded successfully via Enterprise Edge Function"
+            );
+            return;
+          }
+        }
 
-        // TODO: Implementar cuando las EdgeFunctions estén listas
-        // const [companyResult, settingsResult, usageResult] =
-        //   await Promise.allSettled([
-        //     EdgeFunctions.companies.getById(profile.company_id),
-        //     EdgeFunctions.companies.getSettings(profile.company_id),
-        //     EdgeFunctions.companies.getUsageStats(profile.company_id),
-        //   ]);
-      } catch (error) {
-        console.error("❌ Error general cargando datos de empresa:", error);
-        setError("Error cargando datos de empresa");
-
-        // Establecer datos por defecto para evitar bloqueos
-        setCompany({
-          id: profile.company_id,
-          name: "Mi Empresa",
-          subscription_plan: "basic",
-          max_users: 5,
-          max_clients: 100,
-          max_products: 500,
-          max_storage_mb: 1000,
-        });
-        setSettings({
-          company_name: "Mi Empresa",
-          default_currency: "EUR",
-          tax_rate: 21,
-        });
-        setUsage({
-          users: 1,
-          clients: 0,
-          products: 0,
-          storageMB: 0,
-        });
-      } finally {
-        setLoading(false);
-        console.log("🏢 Company context loading completed");
+        console.log(
+          "⚠️ Enterprise Edge Function response not valid, using fallback"
+        );
+      } catch (edgeError) {
+        console.log("⚠️ Enterprise Edge Function failed:", edgeError.message);
       }
-    };
 
-    loadCompanyData();
-  }, [user, profile?.company_id]);
+      // FALLBACK: Usar datos de empresa del usuario (sistema dual)
+      if (auth.user.company) {
+        console.log(
+          "✅ Using company data from user object:",
+          auth.user.company
+        );
+        setCompany(auth.user.company);
+      } else {
+        // Fallback final: datos por defecto si no están en user
+        console.log(
+          "⚠️ Using default company data (company not in user object)"
+        );
+        setCompany({
+          id: auth.user.company_id,
+          name: "Mi Empresa",
+          subscription_plan: "basic",
+          max_users: 5,
+          max_clients: 100,
+          max_products: 500,
+          max_storage_mb: 1000,
+        });
+      }
+
+      setSettings({
+        company_name: auth.user.company?.name || "Mi Empresa",
+        default_currency: "EUR",
+        tax_rate: 21,
+      });
+
+      setUsage({
+        users: 1,
+        clients: 0,
+        products: 0,
+        storageMB: 0,
+      });
+
+      console.log("✅ Company data loaded successfully");
+
+      // TODO: Implementar cuando las EdgeFunctions estén listas para datos en tiempo real
+      // const [companyResult, settingsResult, usageResult] =
+      //   await Promise.allSettled([
+      //     EdgeFunctions.companies.getById(auth.user.company_id),
+      //     EdgeFunctions.companies.getSettings(auth.user.company_id),
+      //     EdgeFunctions.companies.getUsageStats(auth.user.company_id),
+      //   ]);
+    } catch (error) {
+      console.error("❌ Error general cargando datos de empresa:", error);
+      setError("Error cargando datos de empresa");
+
+      // Establecer datos por defecto para evitar bloqueos
+      setCompany({
+        id: auth.user.company_id,
+        name: "Mi Empresa",
+        subscription_plan: "basic",
+        max_users: 5,
+        max_clients: 100,
+        max_products: 500,
+        max_storage_mb: 1000,
+      });
+      setSettings({
+        company_name: "Mi Empresa",
+        default_currency: "EUR",
+        tax_rate: 21,
+      });
+      setUsage({
+        users: 1,
+        clients: 0,
+        products: 0,
+        storageMB: 0,
+      });
+    } finally {
+      setLoading(false);
+      console.log("🏢 Company context loading completed");
+    }
+  };
 
   // Funciones para validar límites usando Edge Functions
   const checkLimit = async (resource, amount = 1) => {
     if (!company?.id) return false;
 
     try {
-      const result = await EdgeFunctions.companies.validateLimit(
-        company.id,
-        resource,
-        amount
+      // ✅ USAR NUEVA ENTERPRISE EDGE FUNCTION PARA VALIDAR LÍMITES
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/companies/validate-limit`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${auth.session.access_token}`,
+            "Content-Type": "application/json",
+            apikey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            resource,
+            amount,
+          }),
+        }
       );
-      return result.success && result.data.canProceed;
+
+      if (response.ok) {
+        const result = await response.json();
+        // Enterprise template format: { success: true, data: {...} }
+        return result.success && result.data?.canProceed;
+      }
+
+      return false;
     } catch (error) {
       console.error("Error verificando límite:", error);
       return false;
@@ -210,15 +318,15 @@ export const CompanyProvider = ({ children }) => {
 
   // Función para refrescar datos
   const refreshData = async () => {
-    if (!user || !profile?.company_id) return;
+    if (!auth.isAuthenticated || !auth.user?.company_id) return;
 
     try {
       setLoading(true);
       setError(null);
 
       const [companyResult, usageResult] = await Promise.allSettled([
-        EdgeFunctions.companies.getById(profile.company_id),
-        EdgeFunctions.companies.getUsageStats(profile.company_id),
+        EdgeFunctions.companies.getById(auth.user.company_id),
+        EdgeFunctions.companies.getUsageStats(auth.user.company_id),
       ]);
 
       if (companyResult.status === "fulfilled" && companyResult.value.success) {

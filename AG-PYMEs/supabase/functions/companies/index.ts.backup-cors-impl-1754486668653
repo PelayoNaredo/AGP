@@ -1,0 +1,421 @@
+/**
+ * � Edge Function: Companies Controller (Enterprise Template)
+ *
+ * Fecha: 2 de agosto de 2025
+ * FASE 3: Arquitectura empresarial unificada
+ *
+ * CARACTERÍSTICAS:
+ * ✅ Enterprise template con funciones nativas DB
+ * ✅ Autenticación con auth.uid() y auth.email()
+ * ✅ RLS automático con set_current_company_id()
+ * ✅ Límites de empresa con check_company_limits()
+ * ✅ Auditoría con get_company_usage_stats()
+ */
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createEnterpriseHandler } from "../_shared/enterprise-template.ts";
+
+// Crear cliente Supabase para usar en las funciones
+const supabaseAdmin = createClient(
+  Deno.env.get("SUPABASE_URL") ?? "",
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+);
+
+// 🚀 Enterprise Handler: Companies Management
+serve(
+  createEnterpriseHandler(async (req, context) => {
+    const url = new URL(req.url);
+    const method = req.method;
+    let pathname = url.pathname;
+
+    // Parse body if present
+    let body = null;
+    if (method === "POST" || method === "PUT") {
+      try {
+        body = await req.json();
+      } catch (error) {
+        // Body might be empty or invalid JSON
+        body = {};
+      }
+    }
+
+    // Handle different path scenarios
+    if (pathname.startsWith("/functions/v1/companies")) {
+      pathname = pathname.replace("/functions/v1/companies", "");
+    }
+    if (pathname === "/companies") {
+      pathname = "/";
+    } else if (pathname.startsWith("/companies/")) {
+      pathname = pathname.replace("/companies", "");
+    }
+    if (pathname === "" || pathname === "/") {
+      pathname = "/";
+    }
+
+    console.log(`🔍 ${method} ${pathname} (original: ${url.pathname})`);
+
+    // Root endpoint (información pública)
+    if (method === "GET" && pathname === "/") {
+      return {
+        message: "Companies Controller is running",
+        timestamp: new Date().toISOString(),
+        endpoints: [
+          "GET / - This info",
+          "GET /current - Get current company data",
+          "GET /settings - Get company settings",
+          "PUT /settings - Update company settings",
+          "GET /usage - Get company usage statistics",
+          "POST /validate-limit - Validate company limits",
+          "POST /invitation - Generate invitation code",
+          "GET /users - Get company users",
+          "GET /limits - Get company limits info",
+          "PUT /current - Update company data",
+        ],
+      };
+    }
+
+    // Resto de endpoints requieren autenticación
+    if (method === "GET" && pathname === "/current") {
+      return await getCurrentCompany(context);
+    }
+
+    if (method === "GET" && pathname === "/settings") {
+      return await getCompanySettings(context);
+    }
+
+    if (method === "PUT" && pathname === "/settings") {
+      return await updateCompanySettings(context, body);
+    }
+
+    if (method === "GET" && pathname === "/usage") {
+      return await getCompanyUsage(context);
+    }
+
+    if (method === "POST" && pathname === "/validate-limit") {
+      return await validateCompanyLimit(context, body);
+    }
+
+    if (method === "POST" && pathname === "/invitation") {
+      return await generateInvitation(context);
+    }
+
+    if (method === "GET" && pathname === "/users") {
+      return await getCompanyUsers(context);
+    }
+
+    if (method === "GET" && pathname === "/limits") {
+      return await getCompanyLimits(context);
+    }
+
+    if (method === "PUT" && pathname === "/current") {
+      return await updateCurrentCompany(context, body);
+    }
+
+    throw new Error("Route not found");
+  })
+);
+
+/**
+ * 🏢 Obtener datos de la empresa actual
+ */
+async function getCurrentCompany(context: any) {
+  const { data, error } = await supabaseAdmin
+    .from("companies")
+    .select("*")
+    .eq("id", context.company_id)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") {
+      throw new Error("Company not found");
+    }
+    throw error;
+  }
+
+  return data;
+}
+
+/**
+ * ⚙️ Obtener configuraciones de la empresa
+ */
+async function getCompanySettings(context: any) {
+  // Intentar obtener de la tabla settings primero
+  const { data: settingsData, error: settingsError } = await supabaseAdmin
+    .from("settings")
+    .select("*")
+    .eq("company_id", context.company_id)
+    .single();
+
+  if (settingsError && settingsError.code !== "PGRST116") {
+    throw settingsError;
+  }
+
+  // Si no hay settings, obtener de la tabla companies
+  if (!settingsData) {
+    const { data: companyData, error: companyError } = await supabaseAdmin
+      .from("companies")
+      .select("company_name, tax_rate, default_currency, settings")
+      .eq("id", context.company_id)
+      .single();
+
+    if (companyError) {
+      throw companyError;
+    }
+
+    // Retornar configuraciones por defecto
+    return {
+      company_id: context.company_id,
+      nombre_local: companyData.company_name || "",
+      default_currency: companyData.default_currency || "EUR",
+      tax_rate: companyData.tax_rate || 21.0,
+      tema: "claro",
+      ...companyData.settings,
+    };
+  }
+
+  return settingsData;
+}
+
+/**
+ * ✏️ Actualizar configuraciones de la empresa
+ */
+async function updateCompanySettings(context: any, settings: any) {
+  const { data, error } = await supabaseAdmin
+    .from("settings")
+    .upsert({
+      company_id: context.company_id,
+      ...settings,
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+/**
+ * 📊 Obtener estadísticas de uso de la empresa
+ */
+async function getCompanyUsage(context: any) {
+  const { data: usageStats, error } = await supabaseAdmin.rpc(
+    "get_company_usage_stats",
+    {
+      company_uuid: context.company_id,
+    }
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  return (
+    usageStats || {
+      users: 0,
+      clients: 0,
+      products: 0,
+      appointments: 0,
+      services: 0,
+      storageMB: 0,
+    }
+  );
+}
+
+/**
+ * 🔍 Validar límites de la empresa
+ */
+async function validateCompanyLimit(context: any, body: any) {
+  const { resource, amount = 1 } = body;
+
+  if (!resource) {
+    throw new Error("Resource type is required");
+  }
+
+  // Usar función nativa de DB para validación de límites
+  const { data: limitCheck, error: limitError } = await supabaseAdmin.rpc(
+    "check_company_limits",
+    {
+      company_uuid: context.company_id,
+      resource_type: resource,
+    }
+  );
+
+  if (limitError) {
+    throw limitError;
+  }
+
+  // Obtener uso actual para respuesta detallada
+  const { data: usageStats, error: usageError } = await supabaseAdmin.rpc(
+    "get_company_usage_stats",
+    {
+      company_uuid: context.company_id,
+    }
+  );
+
+  if (usageError) {
+    throw usageError;
+  }
+
+  // Obtener límites de la empresa
+  const { data: company, error: companyError } = await supabaseAdmin
+    .from("companies")
+    .select("max_users, max_clients, max_products, max_storage_mb")
+    .eq("id", context.company_id)
+    .single();
+
+  if (companyError) {
+    throw companyError;
+  }
+
+  // Calcular valores específicos según el tipo de recurso
+  let currentUsage = 0;
+  let maxLimit = 0;
+
+  switch (resource) {
+    case "users":
+      currentUsage = usageStats.users || 0;
+      maxLimit = company.max_users;
+      break;
+    case "clients":
+      currentUsage = usageStats.clients || 0;
+      maxLimit = company.max_clients;
+      break;
+    case "products":
+      currentUsage = usageStats.products || 0;
+      maxLimit = company.max_products;
+      break;
+    case "storage":
+      currentUsage = usageStats.storageMB || 0;
+      maxLimit = company.max_storage_mb;
+      break;
+    default:
+      throw new Error("Invalid resource type");
+  }
+
+  const allowed = limitCheck === true;
+  const remaining = Math.max(0, maxLimit - currentUsage);
+
+  return {
+    allowed,
+    currentUsage,
+    maxLimit,
+    remaining,
+    resource,
+    wouldExceed: !allowed,
+    percentUsed: maxLimit > 0 ? Math.round((currentUsage / maxLimit) * 100) : 0,
+  };
+}
+
+/**
+ * 💌 Generar código de invitación
+ */
+async function generateInvitation(context: any) {
+  // Usar función nativa de DB para generar código de invitación
+  const { data: invitationCode, error: codeError } = await supabaseAdmin.rpc(
+    "generate_invitation_code"
+  );
+
+  if (codeError) {
+    throw codeError;
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("company_invitations")
+    .insert({
+      company_id: context.company_id,
+      invitation_code: invitationCode,
+      status: "pending",
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+/**
+ * 👥 Obtener usuarios de la empresa
+ */
+async function getCompanyUsers(context: any) {
+  const { data, error } = await supabaseAdmin
+    .from("users")
+    .select("id, nombre, email, rol, fecha_registro, is_active")
+    .eq("company_id", context.company_id)
+    .order("fecha_registro", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  return data || [];
+}
+
+/**
+ * 📊 Obtener límites de la empresa
+ */
+async function getCompanyLimits(context: any) {
+  const { data, error } = await supabaseAdmin
+    .from("companies")
+    .select(
+      "subscription_plan, max_users, max_clients, max_products, max_storage_mb"
+    )
+    .eq("id", context.company_id)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    plan: data.subscription_plan,
+    limits: {
+      max_users: data.max_users,
+      max_clients: data.max_clients,
+      max_products: data.max_products,
+      max_storage_mb: data.max_storage_mb,
+    },
+  };
+}
+
+/**
+ * ✏️ Actualizar datos de la empresa
+ */
+async function updateCurrentCompany(context: any, body: any) {
+  // Preparar datos de actualización (solo ciertos campos permitidos)
+  const allowedFields = [
+    "company_name",
+    "tax_rate",
+    "default_currency",
+    "settings",
+  ];
+
+  const updateData: any = {};
+  allowedFields.forEach((field) => {
+    if (body.hasOwnProperty(field)) {
+      updateData[field] = body[field];
+    }
+  });
+
+  updateData.updated_at = new Date().toISOString();
+
+  const { data, error } = await supabaseAdmin
+    .from("companies")
+    .update(updateData)
+    .eq("id", context.company_id)
+    .select()
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}

@@ -1,0 +1,122 @@
+/**
+ * 🚀 Edge Function: User Sync (Enterprise Template)
+ *
+ * PROPÓSITO: Sincronización automática auth.users ↔ public.users
+ * - Crea registro en public.users cuando alguien se registra
+ * - Sincroniza metadatos entre ambas tablas
+ * - Validación de company_id desde JWT
+ */
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createEnterpriseHandler } from "../_shared/enterprise-template.ts";
+
+serve(
+  createEnterpriseHandler(async ({ supabase, authData, url, method, body }) => {
+    const { email, action = "sync" } = body;
+
+    console.log(`🔄 User sync requested for: ${email}, action: ${action}`);
+
+    // Obtener usuario desde auth.users
+    const { data: authUsers, error: authError } =
+      await supabase.auth.admin.listUsers();
+
+    if (authError) {
+      throw new Error(`Error fetching auth users: ${authError.message}`);
+    }
+
+    const authUser = authUsers.users.find((u: any) => u.email === email);
+
+    if (!authUser) {
+      throw new Error(`User not found in auth.users: ${email}`);
+    }
+
+    console.log(`✅ Found auth user: ${authUser.id}`);
+
+    // 1. Verificar/crear en tabla users personalizada
+    let { data: customUser, error: userError } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", email)
+      .single();
+
+    if (userError && userError.code === "PGRST116") {
+      // Usuario no existe en tabla users, crear uno
+      console.log(`🔧 Creating user in users table: ${email}`);
+
+      // 🔒 CRITICAL: Company_id desde user_metadata del JWT
+      const companyId = authUser.user_metadata?.company_id;
+
+      if (!companyId) {
+        throw new Error(
+          "Company ID not found in user metadata. User must be invited by admin."
+        );
+      }
+
+      const { data: newUser, error: createUserError } = await supabase
+        .from("users")
+        .insert({
+          id: authUser.id, // ✅ MISMO ID que auth.users
+          nombre:
+            authUser.user_metadata?.nombre || authUser.email.split("@")[0],
+          email: authUser.email,
+          company_id: companyId, // ✅ SECURE: Del JWT metadata
+          rol: authUser.user_metadata?.role || "empleado", // Default empleado
+          is_active: true,
+          fecha_registro: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (createUserError) {
+        throw new Error(`Error creating user: ${createUserError.message}`);
+      }
+
+      customUser = newUser;
+      console.log(`✅ User created: ${customUser.id}`);
+    } else if (userError) {
+      throw new Error(`Error fetching user: ${userError.message}`);
+    } else {
+      console.log(`✅ User found: ${customUser.id}`);
+
+      // Sincronizar datos con auth.users metadata si hay diferencias
+      const metadataCompanyId = authUser.user_metadata?.company_id;
+      const metadataRole = authUser.user_metadata?.role;
+
+      if (
+        metadataCompanyId &&
+        (customUser.company_id !== metadataCompanyId ||
+          customUser.rol !== metadataRole)
+      ) {
+        const { error: updateError } = await supabase
+          .from("users")
+          .update({
+            company_id: metadataCompanyId,
+            rol: metadataRole,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", authUser.id);
+
+        if (updateError) {
+          console.warn(`⚠️ Could not sync user: ${updateError.message}`);
+        } else {
+          console.log(`🔄 User synced with auth metadata`);
+        }
+      }
+    }
+
+    // 2. Retornar información completa del usuario
+    return {
+      auth: {
+        id: authUser.id,
+        email: authUser.email,
+        created_at: authUser.created_at,
+        user_metadata: authUser.user_metadata,
+      },
+      user: customUser,
+      synchronized: true,
+      company_id: customUser.company_id,
+      role: customUser.rol,
+    };
+  })
+);

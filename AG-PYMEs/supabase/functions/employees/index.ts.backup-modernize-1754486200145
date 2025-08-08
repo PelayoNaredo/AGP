@@ -1,0 +1,803 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getUserAndCompanyId } from "../_shared/auth-utils.ts";
+import { withCors, createCorsJsonResponse, createCorsErrorResponse } from "../_shared/cors.ts";
+
+// Configuración de Supabase
+const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+
+// Función para validar datos de empleado
+function validateEmployeeData(data: any, isUpdate = false): string[] {
+  const errors: string[] = [];
+
+  // Campos obligatorios en creación
+  if (!isUpdate) {
+    if (!data.nombre) {
+      errors.push("nombre es obligatorio");
+    }
+    if (!data.apellido) {
+      errors.push("apellido es obligatorio");
+    }
+    if (!data.email) {
+      errors.push("email es obligatorio");
+    }
+  }
+
+  // Validación de nombre
+  if (
+    data.nombre &&
+    (typeof data.nombre !== "string" || data.nombre.trim().length === 0)
+  ) {
+    errors.push("nombre debe ser un texto válido");
+  }
+
+  if (data.nombre && data.nombre.length > 100) {
+    errors.push("nombre no puede exceder 100 caracteres");
+  }
+
+  // Validación de apellido
+  if (
+    data.apellido &&
+    (typeof data.apellido !== "string" || data.apellido.trim().length === 0)
+  ) {
+    errors.push("apellido debe ser un texto válido");
+  }
+
+  if (data.apellido && data.apellido.length > 100) {
+    errors.push("apellido no puede exceder 100 caracteres");
+  }
+
+  // Validación de email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (data.email && !emailRegex.test(data.email)) {
+    errors.push("email debe ser una dirección válida");
+  }
+
+  // Validación de teléfono
+  if (data.telefono && data.telefono.length > 20) {
+    errors.push("telefono no puede exceder 20 caracteres");
+  }
+
+  // Validación de posición
+  if (data.posicion && data.posicion.length > 100) {
+    errors.push("posicion no puede exceder 100 caracteres");
+  }
+
+  // Validación de departamento
+  if (data.departamento && data.departamento.length > 100) {
+    errors.push("departamento no puede exceder 100 caracteres");
+  }
+
+  // Validación de salario
+  if (
+    data.salario !== undefined &&
+    data.salario !== null &&
+    (isNaN(parseFloat(data.salario)) || parseFloat(data.salario) < 0)
+  ) {
+    errors.push("salario debe ser un número positivo");
+  }
+
+  // Validación de fecha de contratación
+  if (data.fecha_contratacion && !isValidDate(data.fecha_contratacion)) {
+    errors.push("fecha_contratacion debe ser una fecha válida");
+  }
+
+  // Validación de estado
+  const estadosValidos = ["activo", "inactivo", "suspendido", "vacaciones"];
+  if (data.estado && !estadosValidos.includes(data.estado)) {
+    errors.push(`estado debe ser uno de: ${estadosValidos.join(", ")}`);
+  }
+
+  // Validación de tipo de contrato
+  const tiposContrato = [
+    "tiempo_completo",
+    "tiempo_parcial",
+    "temporal",
+    "freelance",
+    "practicante",
+  ];
+  if (data.tipo_contrato && !tiposContrato.includes(data.tipo_contrato)) {
+    errors.push(`tipo_contrato debe ser uno de: ${tiposContrato.join(", ")}`);
+  }
+
+  return errors;
+}
+
+// Función auxiliar para validar fechas
+function isValidDate(dateString: string): boolean {
+  const date = new Date(dateString);
+  return date instanceof Date && !isNaN(date.getTime());
+}
+
+async function handleSecureRoute(req: Request) {
+  const url = new URL(req.url);
+  const pathSegments = url.pathname.split("/").filter((segment) => segment);
+  const searchParams = url.searchParams;
+
+  // Autenticación y autorización
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader) {
+    return createCorsErrorResponse("Token de autorización requerido", 401);
+  }
+
+  const { companyId, error: authError } = await getUserAndCompanyId(
+    authHeader.replace("Bearer ", "")
+  );
+  if (authError || !companyId) {
+    return new Response(
+      JSON.stringify({
+        error: authError || "Company ID no encontrado en el token",
+      }),
+      {
+        status: 401,
+
+      }
+    );
+  }
+
+  // Rutas para employees
+  if (req.method === "GET") {
+    // GET /employees?status=activo - Obtener empleados por estado
+    if (pathSegments.length === 0 && searchParams.has("status")) {
+      const status = searchParams.get("status")!;
+
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("employees")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("estado", status)
+          .order("apellido", { ascending: true });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener empleados por estado:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener empleados por estado",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /employees?department=ventas - Obtener empleados por departamento
+    if (pathSegments.length === 0 && searchParams.has("department")) {
+      const department = searchParams.get("department")!;
+
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("employees")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("departamento", department)
+          .order("apellido", { ascending: true });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener empleados por departamento:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener empleados por departamento",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /employees?search=nombre - Buscar empleados
+    if (pathSegments.length === 0 && searchParams.has("search")) {
+      const searchTerm = searchParams.get("search")!;
+
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("employees")
+          .select("*")
+          .eq("company_id", companyId)
+          .or(
+            `nombre.ilike.%${searchTerm}%,apellido.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`
+          )
+          .order("apellido", { ascending: true });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al buscar empleados:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al buscar empleados",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /employees/active - Obtener empleados activos
+    if (pathSegments.length === 1 && pathSegments[0] === "active") {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("employees")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("estado", "activo")
+          .order("apellido", { ascending: true });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener empleados activos:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener empleados activos",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /employees/departments - Obtener lista de departamentos
+    if (pathSegments.length === 1 && pathSegments[0] === "departments") {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("employees")
+          .select("departamento")
+          .eq("company_id", companyId)
+          .not("departamento", "is", null);
+
+        if (error) throw error;
+
+        // Obtener departamentos únicos
+        const uniqueDepartments = [
+          ...new Set(data.map((emp) => emp.departamento)),
+        ];
+
+        return createCorsJsonResponse(uniqueDepartments, 200);
+      } catch (error: any) {
+        console.error("Error al obtener departamentos:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener departamentos",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /employees/stats - Obtener estadísticas de empleados
+    if (pathSegments.length === 1 && pathSegments[0] === "stats") {
+      try {
+        const { data: employeesData, error } = await supabaseAdmin
+          .from("employees")
+          .select("estado, departamento, tipo_contrato, salario")
+          .eq("company_id", companyId);
+
+        if (error) throw error;
+
+        // Procesar estadísticas
+        const stats = {
+          general: {
+            total_empleados: employeesData.length,
+            empleados_activos: employeesData.filter(
+              (emp) => emp.estado === "activo"
+            ).length,
+            salario_promedio: 0,
+            salario_maximo: 0,
+            salario_minimo: 0,
+          },
+          por_estado: {} as any,
+          por_departamento: {} as any,
+          por_tipo_contrato: {} as any,
+        };
+
+        if (employeesData.length > 0) {
+          // Calcular estadísticas salariales
+          const salarios = employeesData
+            .filter((emp) => emp.salario)
+            .map((emp) => parseFloat(emp.salario));
+
+          if (salarios.length > 0) {
+            stats.general.salario_promedio =
+              salarios.reduce((sum, sal) => sum + sal, 0) / salarios.length;
+            stats.general.salario_maximo = Math.max(...salarios);
+            stats.general.salario_minimo = Math.min(...salarios);
+          }
+
+          // Agrupar por estado
+          employeesData.forEach((emp) => {
+            const estado = emp.estado || "sin_especificar";
+            stats.por_estado[estado] = (stats.por_estado[estado] || 0) + 1;
+          });
+
+          // Agrupar por departamento
+          employeesData.forEach((emp) => {
+            const departamento = emp.departamento || "sin_departamento";
+            stats.por_departamento[departamento] =
+              (stats.por_departamento[departamento] || 0) + 1;
+          });
+
+          // Agrupar por tipo de contrato
+          employeesData.forEach((emp) => {
+            const tipo = emp.tipo_contrato || "sin_especificar";
+            stats.por_tipo_contrato[tipo] =
+              (stats.por_tipo_contrato[tipo] || 0) + 1;
+          });
+        }
+
+        return createCorsJsonResponse(stats, 200);
+      } catch (error: any) {
+        console.error("Error al obtener estadísticas:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener estadísticas",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /employees - Obtener todos los empleados
+    if (pathSegments.length === 0) {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("employees")
+          .select("*")
+          .eq("company_id", companyId)
+          .order("apellido", { ascending: true });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener empleados:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener empleados",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /employees/:id - Obtener empleado por ID
+    if (
+      pathSegments.length === 1 &&
+      !["active", "departments", "stats"].includes(pathSegments[0])
+    ) {
+      const employeeId = pathSegments[0];
+
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("employees")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("id_empleado", employeeId)
+          .single();
+
+        if (error) {
+          if (error.code === "PGRST116") {
+            return createCorsErrorResponse("Empleado no encontrado", 404);
+          }
+          throw error;
+        }
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener empleado:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener empleado",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+  }
+
+  if (req.method === "POST") {
+    // POST /employees - Crear nuevo empleado
+    if (pathSegments.length === 0) {
+      try {
+        const employeeData = await req.json();
+
+        // Validar datos
+        const validationErrors = validateEmployeeData(employeeData);
+        if (validationErrors.length > 0) {
+          return new Response(
+            JSON.stringify({
+              error: "Datos inválidos",
+              details: validationErrors,
+            }),
+            {
+              status: 400,
+
+            }
+          );
+        }
+
+        // Verificar que el email no esté en uso en la empresa
+        const { data: existingEmployee } = await supabaseAdmin
+          .from("employees")
+          .select("id_empleado")
+          .eq("company_id", companyId)
+          .eq("email", employeeData.email)
+          .single();
+
+        if (existingEmployee) {
+          return new Response(
+            JSON.stringify({
+              error: "Ya existe un empleado con este email en la empresa",
+            }),
+            {
+              status: 400,
+
+            }
+          );
+        }
+
+        // Preparar datos para inserción
+        const insertData = {
+          company_id: companyId,
+          nombre: employeeData.nombre,
+          apellido: employeeData.apellido,
+          email: employeeData.email,
+          telefono: employeeData.telefono || null,
+          direccion: employeeData.direccion || null,
+          posicion: employeeData.posicion || null,
+          departamento: employeeData.departamento || null,
+          salario: employeeData.salario
+            ? parseFloat(employeeData.salario)
+            : null,
+          fecha_contratacion:
+            employeeData.fecha_contratacion ||
+            new Date().toISOString().split("T")[0],
+          estado: employeeData.estado || "activo",
+          tipo_contrato: employeeData.tipo_contrato || "tiempo_completo",
+          documento_identidad: employeeData.documento_identidad || null,
+          fecha_nacimiento: employeeData.fecha_nacimiento || null,
+          genero: employeeData.genero || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        const { data, error } = await supabaseAdmin
+          .from("employees")
+          .insert(insertData)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 201);
+      } catch (error: any) {
+        console.error("Error al crear empleado:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al crear empleado",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+  }
+
+  if (req.method === "PUT") {
+    // PUT /employees/:id - Actualizar empleado
+    if (pathSegments.length === 1) {
+      const employeeId = pathSegments[0];
+
+      try {
+        const employeeData = await req.json();
+
+        // Validar datos
+        const validationErrors = validateEmployeeData(employeeData, true);
+        if (validationErrors.length > 0) {
+          return new Response(
+            JSON.stringify({
+              error: "Datos inválidos",
+              details: validationErrors,
+            }),
+            {
+              status: 400,
+
+            }
+          );
+        }
+
+        // Verificar que el empleado existe y pertenece a la empresa
+        const { data: existingEmployee } = await supabaseAdmin
+          .from("employees")
+          .select("id_empleado, email")
+          .eq("company_id", companyId)
+          .eq("id_empleado", employeeId)
+          .single();
+
+        if (!existingEmployee) {
+          return createCorsErrorResponse("Empleado no encontrado", 404);
+        }
+
+        // Si se actualiza el email, verificar que no esté en uso por otro empleado
+        if (
+          employeeData.email &&
+          employeeData.email !== existingEmployee.email
+        ) {
+          const { data: emailInUse } = await supabaseAdmin
+            .from("employees")
+            .select("id_empleado")
+            .eq("company_id", companyId)
+            .eq("email", employeeData.email)
+            .neq("id_empleado", employeeId)
+            .single();
+
+          if (emailInUse) {
+            return new Response(
+              JSON.stringify({
+                error: "Este email ya está en uso por otro empleado",
+              }),
+              {
+                status: 400,
+
+              }
+            );
+          }
+        }
+
+        // Preparar datos para actualización
+        const updateData: any = {
+          updated_at: new Date().toISOString(),
+        };
+
+        if (employeeData.nombre !== undefined) {
+          updateData.nombre = employeeData.nombre;
+        }
+        if (employeeData.apellido !== undefined) {
+          updateData.apellido = employeeData.apellido;
+        }
+        if (employeeData.email !== undefined) {
+          updateData.email = employeeData.email;
+        }
+        if (employeeData.telefono !== undefined) {
+          updateData.telefono = employeeData.telefono || null;
+        }
+        if (employeeData.direccion !== undefined) {
+          updateData.direccion = employeeData.direccion || null;
+        }
+        if (employeeData.posicion !== undefined) {
+          updateData.posicion = employeeData.posicion || null;
+        }
+        if (employeeData.departamento !== undefined) {
+          updateData.departamento = employeeData.departamento || null;
+        }
+        if (employeeData.salario !== undefined) {
+          updateData.salario = employeeData.salario
+            ? parseFloat(employeeData.salario)
+            : null;
+        }
+        if (employeeData.fecha_contratacion !== undefined) {
+          updateData.fecha_contratacion = employeeData.fecha_contratacion;
+        }
+        if (employeeData.estado !== undefined) {
+          updateData.estado = employeeData.estado;
+        }
+        if (employeeData.tipo_contrato !== undefined) {
+          updateData.tipo_contrato = employeeData.tipo_contrato;
+        }
+        if (employeeData.documento_identidad !== undefined) {
+          updateData.documento_identidad =
+            employeeData.documento_identidad || null;
+        }
+        if (employeeData.fecha_nacimiento !== undefined) {
+          updateData.fecha_nacimiento = employeeData.fecha_nacimiento || null;
+        }
+        if (employeeData.genero !== undefined) {
+          updateData.genero = employeeData.genero || null;
+        }
+
+        const { data, error } = await supabaseAdmin
+          .from("employees")
+          .update(updateData)
+          .eq("id_empleado", employeeId)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al actualizar empleado:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al actualizar empleado",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // PUT /employees/:id/status - Cambiar estado del empleado
+    if (pathSegments.length === 2 && pathSegments[1] === "status") {
+      const employeeId = pathSegments[0];
+
+      try {
+        const { status } = await req.json();
+
+        const estadosValidos = [
+          "activo",
+          "inactivo",
+          "suspendido",
+          "vacaciones",
+        ];
+        if (!estadosValidos.includes(status)) {
+          return new Response(
+            JSON.stringify({
+              error: `Estado inválido. Debe ser uno de: ${estadosValidos.join(", ")}`,
+            }),
+            {
+              status: 400,
+
+            }
+          );
+        }
+
+        // Verificar que el empleado existe y pertenece a la empresa
+        const { data: existingEmployee } = await supabaseAdmin
+          .from("employees")
+          .select("id_empleado")
+          .eq("company_id", companyId)
+          .eq("id_empleado", employeeId)
+          .single();
+
+        if (!existingEmployee) {
+          return createCorsErrorResponse("Empleado no encontrado", 404);
+        }
+
+        const { data, error } = await supabaseAdmin
+          .from("employees")
+          .update({
+            estado: status,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id_empleado", employeeId)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al cambiar estado del empleado:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al cambiar estado del empleado",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+  }
+
+  if (req.method === "DELETE") {
+    // DELETE /employees/:id - Eliminar empleado
+    if (pathSegments.length === 1) {
+      const employeeId = pathSegments[0];
+
+      try {
+        // Verificar que el empleado existe y pertenece a la empresa
+        const { data: existingEmployee } = await supabaseAdmin
+          .from("employees")
+          .select("id_empleado")
+          .eq("company_id", companyId)
+          .eq("id_empleado", employeeId)
+          .single();
+
+        if (!existingEmployee) {
+          return createCorsErrorResponse("Empleado no encontrado", 404);
+        }
+
+        // En lugar de eliminar completamente, cambiar estado a inactivo por integridad referencial
+        const { data, error } = await supabaseAdmin
+          .from("employees")
+          .update({
+            estado: "inactivo",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id_empleado", employeeId)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        return new Response(
+          JSON.stringify({
+            message: "Empleado marcado como inactivo correctamente",
+            employee: data,
+          }),
+          {
+            status: 200,
+
+          }
+        );
+      } catch (error: any) {
+        console.error("Error al desactivar empleado:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al desactivar empleado",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+  }
+
+  // Ruta no encontrada
+  return createCorsErrorResponse("Endpoint no encontrado", 404);
+}
+
+serve(withCors(async (req) => {
+  // Manejar preflight CORS
+  if (req.method === "OPTIONS") {
+    return new Response("ok");
+  }
+
+  try {
+    return await handleSecureRoute(req);
+  } catch (error: any) {
+    console.error("Error en employees EdgeFunction:", error);
+    return createCorsErrorResponse("Error interno del servidor", 500);
+  }
+}));

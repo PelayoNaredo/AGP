@@ -45,46 +45,68 @@ const InitialLoader = () => {
 
 // Componente principal con autenticación y tema
 const MainApp = () => {
-  const { user, loading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   const { themeObject, isLoading: isThemeLoading } = useTheme();
+
+  console.log("🔍 MainApp render - Auth state:", {
+    user: !!user,
+    isAuthenticated,
+    loading,
+    userEmail: user?.email,
+  });
 
   // Si está cargando la autenticación o el tema, mostrar indicador
   if (loading || isThemeLoading) {
+    console.log(
+      "⏳ MainApp showing loader - loading:",
+      loading,
+      "themeLoading:",
+      isThemeLoading
+    );
     return <InitialLoader />;
   }
 
   // Si el usuario está autenticado, muestra la app
-  return user ? (
-    <>
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: themeObject.colors.background,
-        }}
-      >
-        <NavigationContainer
-          theme={{
-            dark: themeObject.dark,
-            colors: {
-              ...themeObject.colors,
-              primary: themeObject.colors.primary,
-              background: themeObject.colors.background,
-              card: themeObject.colors.surface,
-              text: themeObject.colors.text,
-              border: themeObject.colors.border,
-              notification: themeObject.colors.notification,
-            },
+  if (isAuthenticated && user) {
+    console.log("🚀 MainApp rendering authenticated app for:", user.email);
+    return (
+      <>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: themeObject.colors.background,
           }}
         >
-          <Header />
-          <CustomBottomTabs />
-        </NavigationContainer>
-      </View>
-    </>
-  ) : (
-    // Si no está autenticado, muestra la pantalla de login
-    <LoginScreen />
+          <NavigationContainer
+            theme={{
+              dark: themeObject.dark,
+              colors: {
+                ...themeObject.colors,
+                primary: themeObject.colors.primary,
+                background: themeObject.colors.background,
+                card: themeObject.colors.surface,
+                text: themeObject.colors.text,
+                border: themeObject.colors.border,
+                notification: themeObject.colors.notification,
+              },
+            }}
+          >
+            <Header />
+            <CustomBottomTabs />
+          </NavigationContainer>
+        </View>
+      </>
+    );
+  }
+
+  // Si no está autenticado, muestra la pantalla de login
+  console.log(
+    "🔐 MainApp rendering login screen - isAuthenticated:",
+    isAuthenticated,
+    "user:",
+    !!user
   );
+  return <LoginScreen />;
 };
 
 // Punto de entrada de la aplicación

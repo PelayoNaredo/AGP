@@ -116,3 +116,59 @@ export const formatDateTime = (dateTimeString) => {
     return "N/A";
   }
 };
+
+/**
+ * Normaliza los datos de respuesta de servicios API
+ * Maneja tanto arrays directos como objetos wrapped con data/items
+ * @param {any} response - La respuesta de la API
+ * @returns {Array} - Array normalizado de datos
+ */
+export const normalizeAPIResponse = (response) => {
+  // Si es null o undefined, devolver array vacío
+  if (!response) {
+    return [];
+  }
+
+  // Si es array directo, devolverlo
+  if (Array.isArray(response)) {
+    return response;
+  }
+
+  // Si es un objeto de error, devolver array vacío
+  if (response && response.success === false) {
+    console.warn("🚨 Respuesta de API con error:", {
+      error: response.error,
+      status: response.status,
+      details: response.details,
+    });
+    return [];
+  }
+
+  // Si tiene data y es array
+  if (response && Array.isArray(response.data)) {
+    return response.data;
+  }
+
+  // Si tiene items y es array
+  if (response && Array.isArray(response.items)) {
+    return response.items;
+  }
+
+  // Si tiene success=true pero data no es array
+  if (response && response.success === true && response.data) {
+    if (Array.isArray(response.data)) {
+      return response.data;
+    }
+    // Si data es un objeto único, devolverlo como array de un elemento
+    return [response.data];
+  }
+
+  // Si no se puede normalizar, devolver array vacío y advertir
+  console.warn("⚠️ No se pudo normalizar la respuesta API:", {
+    type: typeof response,
+    keys:
+      response && typeof response === "object" ? Object.keys(response) : "N/A",
+    response: response,
+  });
+  return [];
+};

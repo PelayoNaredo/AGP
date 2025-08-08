@@ -1,1608 +1,843 @@
-// Servicio unificado para EdgeFunctions
-// Reemplaza todos los servicios individuales para usar las EdgeFunctions desplegadas
-import { EdgeFunctions } from "../config/supabase";
+// ✅ api/edgeFunctionsService.js - VERSIÓN CORREGIDA
+// 🔧 Sin dependencias circulares, responses normalizados
 
-/**
- * Servicio unificado para todas las EdgeFunctions
- * Cada función maneja errores y devuelve datos consistentes
- */
+import { callEdgeFunction, EdgeFunctions } from "../config/supabase.js";
 
-// ==================== AUTHENTICATION ====================
+// 🔐 AUTENTICACIÓN
 export const authService = {
-  // Login usando EdgeFunction de login
   login: async (credentials) => {
+    console.log("🔐 [AUTH] Iniciando login...");
     try {
-      const result =
-        (await EdgeFunctions.auth.login?.(credentials)) ||
-        (await fetch(
-          `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/login`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              apikey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
-            },
-            body: JSON.stringify(credentials),
-          }
-        ).then((res) => res.json()));
-
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error en login");
-      }
+      const result = await callEdgeFunction(
+        "login/auth/login",
+        credentials,
+        "POST",
+        2,
+        false // Login no requiere token previo
+      );
+      console.log("✅ [AUTH] Login exitoso");
+      return result;
     } catch (error) {
-      console.error("[AUTH_SERVICE] Error en login:", error);
+      console.error("❌ [AUTH] Error en login:", error);
       throw error;
     }
   },
 
-  // Register usando EdgeFunction de register
   register: async (userData) => {
+    console.log("📝 [AUTH] Iniciando registro...");
     try {
-      const result = await EdgeFunctions.auth.register(userData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error en registro");
-      }
+      const result = await callEdgeFunction(
+        "register",
+        userData,
+        "POST",
+        2,
+        false // Registro no requiere token
+      );
+      console.log("✅ [AUTH] Registro exitoso");
+      return result;
     } catch (error) {
-      console.error("[AUTH_SERVICE] Error en register:", error);
+      console.error("❌ [AUTH] Error en registro:", error);
+      throw error;
+    }
+  },
+
+  sync: async (email) => {
+    console.log("🔄 [AUTH] Sincronizando usuario...");
+    try {
+      const result = await callEdgeFunction(
+        "login/auth/sync",
+        { email, action: "login" },
+        "POST",
+        2,
+        true // Sync requiere autenticación
+      );
+      console.log("✅ [AUTH] Sincronización exitosa");
+      return result;
+    } catch (error) {
+      console.error("❌ [AUTH] Error en sincronización:", error);
+      throw error;
+    }
+  },
+
+  verify: async () => {
+    console.log("🔍 [AUTH] Verificando token...");
+    try {
+      const result = await callEdgeFunction(
+        "login/auth/verify",
+        {},
+        "GET",
+        2,
+        true
+      );
+      console.log("✅ [AUTH] Token verificado");
+      return result;
+    } catch (error) {
+      console.error("❌ [AUTH] Error verificando token:", error);
+      throw error;
+    }
+  },
+
+  getCurrentUser: async () => {
+    console.log("👤 [AUTH] Obteniendo usuario actual...");
+    try {
+      const result = await callEdgeFunction(
+        "users/current",
+        {},
+        "GET",
+        2,
+        true
+      );
+      console.log("✅ [AUTH] Usuario actual obtenido");
+      return result;
+    } catch (error) {
+      console.error("❌ [AUTH] Error obteniendo usuario actual:", error);
+      throw error;
+    }
+  },
+
+  logout: async () => {
+    console.log("👋 [AUTH] Cerrando sesión...");
+    try {
+      const result = await callEdgeFunction("auth/logout", {}, "POST", 1, true);
+      console.log("✅ [AUTH] Logout exitoso");
+      return result;
+    } catch (error) {
+      console.error("❌ [AUTH] Error en logout:", error);
       throw error;
     }
   },
 };
 
-// ==================== COMPANIES ====================
-export const companiesService = {
-  getAll: async () => {
-    try {
-      const result =
-        (await EdgeFunctions.companies.getAll?.()) ||
-        (await fetch(
-          `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/companies`,
-          {
-            headers: { apikey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY },
-          }
-        ).then((res) => res.json()));
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error("[COMPANIES_SERVICE] Error getting companies:", error);
-      return [];
-    }
-  },
-
-  getById: async (id) => {
-    try {
-      const result = await EdgeFunctions.companies.getById(id);
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error("[COMPANIES_SERVICE] Error getting company:", error);
-      return null;
-    }
-  },
-
+// 🏢 EMPRESAS
+export const companyService = {
   getCurrent: async () => {
+    console.log("🏢 [COMPANY] Obteniendo empresa actual...");
     try {
-      const result = await EdgeFunctions.companies.getCurrent();
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error(
-        "[COMPANIES_SERVICE] Error getting current company:",
-        error
+      const result = await callEdgeFunction(
+        "companies/current",
+        {},
+        "GET",
+        2,
+        true
       );
-      return null;
+      console.log("✅ [COMPANY] Empresa actual obtenida");
+      return result;
+    } catch (error) {
+      console.error("❌ [COMPANY] Error obteniendo empresa:", error);
+      throw error;
+    }
+  },
+
+  create: async (companyData) => {
+    console.log("🏢 [COMPANY] Creando empresa...");
+    try {
+      const result = await callEdgeFunction(
+        "companies",
+        companyData,
+        "POST",
+        2,
+        true
+      );
+      console.log("✅ [COMPANY] Empresa creada");
+      return result;
+    } catch (error) {
+      console.error("❌ [COMPANY] Error creando empresa:", error);
+      throw error;
+    }
+  },
+
+  update: async (id, companyData) => {
+    console.log(`🏢 [COMPANY] Actualizando empresa ${id}...`);
+    try {
+      const result = await callEdgeFunction(
+        `companies/${id}`,
+        companyData,
+        "PUT",
+        2,
+        true
+      );
+      console.log("✅ [COMPANY] Empresa actualizada");
+      return result;
+    } catch (error) {
+      console.error("❌ [COMPANY] Error actualizando empresa:", error);
+      throw error;
     }
   },
 
   getUsage: async () => {
+    console.log("📊 [COMPANY] Obteniendo uso de recursos...");
     try {
-      const result = await EdgeFunctions.companies.getUsage();
-      return result.success ? result.data : null;
+      const result = await callEdgeFunction(
+        "companies/usage",
+        {},
+        "GET",
+        2,
+        true
+      );
+      console.log("✅ [COMPANY] Uso de recursos obtenido");
+      return result;
     } catch (error) {
-      console.error("[COMPANIES_SERVICE] Error getting usage:", error);
-      return null;
-    }
-  },
-};
-
-// ==================== ALERTS ====================
-export const alertsService = {
-  getAll: async () => {
-    try {
-      const result = await EdgeFunctions.alerts.getAll();
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error("[ALERTS_SERVICE] Error getting alerts:", error);
-      return [];
-    }
-  },
-
-  getById: async (id) => {
-    try {
-      const result = await EdgeFunctions.alerts.getById(id);
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error("[ALERTS_SERVICE] Error getting alert:", error);
-      return null;
-    }
-  },
-
-  create: async (alertData) => {
-    try {
-      const result = await EdgeFunctions.alerts.create(alertData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error creating alert");
-      }
-    } catch (error) {
-      console.error("[ALERTS_SERVICE] Error creating alert:", error);
+      console.error("❌ [COMPANY] Error obteniendo uso:", error);
       throw error;
     }
   },
 
-  update: async (id, alertData) => {
+  getLimits: async () => {
+    console.log("🚧 [COMPANY] Obteniendo límites...");
     try {
-      const result = await EdgeFunctions.alerts.update(id, alertData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error updating alert");
-      }
+      const result = await callEdgeFunction(
+        "companies/limits",
+        {},
+        "GET",
+        2,
+        true
+      );
+      console.log("✅ [COMPANY] Límites obtenidos");
+      return result;
     } catch (error) {
-      console.error("[ALERTS_SERVICE] Error updating alert:", error);
-      throw error;
-    }
-  },
-
-  delete: async (id) => {
-    try {
-      const result = await EdgeFunctions.alerts.delete(id);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error deleting alert");
-      }
-    } catch (error) {
-      console.error("[ALERTS_SERVICE] Error deleting alert:", error);
+      console.error("❌ [COMPANY] Error obteniendo límites:", error);
       throw error;
     }
   },
 };
 
-// ==================== CLIENTS ====================
-export const clientsService = {
-  getAll: async () => {
+// 📊 DASHBOARD - SERVICIO EXPANDIDO
+export const dashboardService = {
+  getOverview: async () => {
+    console.log("📊 [DASHBOARD] Obteniendo overview...");
     try {
-      const result = await EdgeFunctions.clients.getAll();
-      return result.success ? result.data : [];
+      const result = await callEdgeFunction("dashboard", {}, "GET", 2, true);
+      console.log("✅ [DASHBOARD] Overview obtenido");
+      return result;
     } catch (error) {
-      console.error("[CLIENTS_SERVICE] Error getting clients:", error);
-      return [];
-    }
-  },
-
-  getById: async (id) => {
-    try {
-      const result = await EdgeFunctions.clients.getById(id);
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error("[CLIENTS_SERVICE] Error getting client:", error);
-      return null;
-    }
-  },
-
-  create: async (clientData) => {
-    try {
-      const result = await EdgeFunctions.clients.create(clientData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error creating client");
-      }
-    } catch (error) {
-      console.error("[CLIENTS_SERVICE] Error creating client:", error);
+      console.error("❌ [DASHBOARD] Error obteniendo overview:", error);
       throw error;
     }
   },
 
-  update: async (id, clientData) => {
+  getStatistics: async () => {
+    console.log("📈 [DASHBOARD] Obteniendo estadísticas...");
     try {
-      const result = await EdgeFunctions.clients.update(id, clientData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error updating client");
-      }
+      const result = await callEdgeFunction("dashboard", {}, "GET", 2, true);
+      console.log("✅ [DASHBOARD] Estadísticas obtenidas");
+      return result;
     } catch (error) {
-      console.error("[CLIENTS_SERVICE] Error updating client:", error);
+      console.error("❌ [DASHBOARD] Error obteniendo estadísticas:", error);
       throw error;
     }
   },
 
-  delete: async (id) => {
+  getData: async () => {
+    console.log("📊 [DASHBOARD] Obteniendo datos generales...");
     try {
-      const result = await EdgeFunctions.clients.delete(id);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error deleting client");
-      }
+      const result = await callEdgeFunction("dashboard", {}, "GET", 2, true);
+      console.log("✅ [DASHBOARD] Datos generales obtenidos");
+      return result;
     } catch (error) {
-      console.error("[CLIENTS_SERVICE] Error deleting client:", error);
+      console.error("❌ [DASHBOARD] Error obteniendo datos:", error);
+      throw error;
+    }
+  },
+
+  getFinancial: async () => {
+    console.log("💰 [DASHBOARD] Obteniendo datos financieros...");
+    try {
+      const result = await callEdgeFunction("dashboard", {}, "GET", 2, true);
+      console.log("✅ [DASHBOARD] Datos financieros obtenidos");
+      return result;
+    } catch (error) {
+      console.error(
+        "❌ [DASHBOARD] Error obteniendo datos financieros:",
+        error
+      );
+      throw error;
+    }
+  },
+
+  getTrend: async (period = "month") => {
+    console.log(`📈 [DASHBOARD] Obteniendo tendencias para ${period}...`);
+    try {
+      const result = await callEdgeFunction(
+        "dashboard",
+        { period },
+        "POST",
+        2,
+        true
+      );
+      console.log("✅ [DASHBOARD] Tendencias obtenidas");
+      return result;
+    } catch (error) {
+      console.error("❌ [DASHBOARD] Error obteniendo tendencias:", error);
+      throw error;
+    }
+  },
+
+  getInventory: async () => {
+    console.log("📦 [DASHBOARD] Obteniendo resumen de inventario...");
+    try {
+      const result = await callEdgeFunction("dashboard", {}, "GET", 2, true);
+      console.log("✅ [DASHBOARD] Resumen de inventario obtenido");
+      return result;
+    } catch (error) {
+      console.error(
+        "❌ [DASHBOARD] Error obteniendo resumen de inventario:",
+        error
+      );
       throw error;
     }
   },
 };
 
-// ==================== EMPLOYEES ====================
+// 👥 EMPLEADOS - SERVICIO EXPANDIDO
 export const employeesService = {
   getAll: async () => {
+    console.log("👥 [EMPLOYEES] Obteniendo empleados...");
     try {
-      const result = await EdgeFunctions.employees.getAll();
-      return result.success ? result.data : [];
+      const result = await callEdgeFunction("employees", {}, "GET", 2, true);
+      console.log("✅ [EMPLOYEES] Empleados obtenidos");
+      return result;
     } catch (error) {
-      console.error("[EMPLOYEES_SERVICE] Error getting employees:", error);
-      return [];
-    }
-  },
-
-  getById: async (id) => {
-    try {
-      const result = await EdgeFunctions.employees.getById(id);
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error("[EMPLOYEES_SERVICE] Error getting employee:", error);
-      return null;
+      console.error("❌ [EMPLOYEES] Error obteniendo empleados:", error);
+      throw error;
     }
   },
 
   create: async (employeeData) => {
+    console.log("👥 [EMPLOYEES] Creando empleado...");
     try {
-      const result = await EdgeFunctions.employees.create(employeeData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error creating employee");
-      }
+      const result = await callEdgeFunction(
+        "employees",
+        employeeData,
+        "POST",
+        2,
+        true
+      );
+      console.log("✅ [EMPLOYEES] Empleado creado");
+      return result;
     } catch (error) {
-      console.error("[EMPLOYEES_SERVICE] Error creating employee:", error);
+      console.error("❌ [EMPLOYEES] Error creando empleado:", error);
+      throw error;
+    }
+  },
+
+  getById: async (id) => {
+    console.log(`👥 [EMPLOYEES] Obteniendo empleado ${id}...`);
+    try {
+      const result = await callEdgeFunction(
+        `employees/${id}`,
+        {},
+        "GET",
+        2,
+        true
+      );
+      console.log("✅ [EMPLOYEES] Empleado obtenido");
+      return result;
+    } catch (error) {
+      console.error("❌ [EMPLOYEES] Error obteniendo empleado:", error);
       throw error;
     }
   },
 
   update: async (id, employeeData) => {
+    console.log(`👥 [EMPLOYEES] Actualizando empleado ${id}...`);
     try {
-      const result = await EdgeFunctions.employees.update(id, employeeData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error updating employee");
-      }
+      const result = await callEdgeFunction(
+        `employees/${id}`,
+        employeeData,
+        "PUT",
+        2,
+        true
+      );
+      console.log("✅ [EMPLOYEES] Empleado actualizado");
+      return result;
     } catch (error) {
-      console.error("[EMPLOYEES_SERVICE] Error updating employee:", error);
+      console.error("❌ [EMPLOYEES] Error actualizando empleado:", error);
       throw error;
     }
   },
 
   delete: async (id) => {
+    console.log(`👥 [EMPLOYEES] Eliminando empleado ${id}...`);
     try {
-      const result = await EdgeFunctions.employees.delete(id);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error deleting employee");
-      }
+      const result = await callEdgeFunction(
+        `employees/${id}`,
+        {},
+        "DELETE",
+        2,
+        true
+      );
+      console.log("✅ [EMPLOYEES] Empleado eliminado");
+      return result;
     } catch (error) {
-      console.error("[EMPLOYEES_SERVICE] Error deleting employee:", error);
+      console.error("❌ [EMPLOYEES] Error eliminando empleado:", error);
       throw error;
     }
   },
 };
 
-// ==================== APPOINTMENTS ====================
-export const appointmentsService = {
-  getAll: async () => {
-    try {
-      const result = await EdgeFunctions.appointments.getAll();
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error(
-        "[APPOINTMENTS_SERVICE] Error getting appointments:",
-        error
-      );
-      return [];
-    }
-  },
-
-  getById: async (id) => {
-    try {
-      const result = await EdgeFunctions.appointments.getById(id);
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error("[APPOINTMENTS_SERVICE] Error getting appointment:", error);
-      return null;
-    }
-  },
-
-  getByClient: async (clientId) => {
-    try {
-      const result = await EdgeFunctions.appointments.getByClient(clientId);
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error(
-        "[APPOINTMENTS_SERVICE] Error getting appointments by client:",
-        error
-      );
-      return [];
-    }
-  },
-
-  getByEmployee: async (employeeId) => {
-    try {
-      const result = await EdgeFunctions.appointments.getByEmployee(employeeId);
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error(
-        "[APPOINTMENTS_SERVICE] Error getting appointments by employee:",
-        error
-      );
-      return [];
-    }
-  },
-
-  getByDateRange: async (startDate, endDate) => {
-    try {
-      const result = await EdgeFunctions.appointments.getByDateRange(
-        startDate,
-        endDate
-      );
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error(
-        "[APPOINTMENTS_SERVICE] Error getting appointments by date range:",
-        error
-      );
-      return [];
-    }
-  },
-
-  create: async (appointmentData) => {
-    try {
-      const result = await EdgeFunctions.appointments.create(appointmentData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error creating appointment");
-      }
-    } catch (error) {
-      console.error(
-        "[APPOINTMENTS_SERVICE] Error creating appointment:",
-        error
-      );
-      throw error;
-    }
-  },
-
-  update: async (id, appointmentData) => {
-    try {
-      const result = await EdgeFunctions.appointments.update(
-        id,
-        appointmentData
-      );
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error updating appointment");
-      }
-    } catch (error) {
-      console.error(
-        "[APPOINTMENTS_SERVICE] Error updating appointment:",
-        error
-      );
-      throw error;
-    }
-  },
-
-  updateStatus: async (id, status) => {
-    try {
-      const result = await EdgeFunctions.appointments.updateStatus(id, status);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error updating appointment status");
-      }
-    } catch (error) {
-      console.error(
-        "[APPOINTMENTS_SERVICE] Error updating appointment status:",
-        error
-      );
-      throw error;
-    }
-  },
-
-  delete: async (id) => {
-    try {
-      const result = await EdgeFunctions.appointments.delete(id);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error deleting appointment");
-      }
-    } catch (error) {
-      console.error(
-        "[APPOINTMENTS_SERVICE] Error deleting appointment:",
-        error
-      );
-      throw error;
-    }
-  },
-
-  checkAvailability: async (employeeId, date, time) => {
-    try {
-      const result = await EdgeFunctions.appointments.checkAvailability(
-        employeeId,
-        date,
-        time
-      );
-      return result.success ? result.data : false;
-    } catch (error) {
-      console.error(
-        "[APPOINTMENTS_SERVICE] Error checking availability:",
-        error
-      );
-      return false;
-    }
-  },
-};
-
-// ==================== INVENTORY ====================
+// 📦 INVENTARIO - SERVICIO EXPANDIDO
 export const inventoryService = {
   getAll: async () => {
+    console.log("📦 [INVENTORY] Obteniendo inventario...");
     try {
-      const result = await EdgeFunctions.inventory.getAll();
-      return result.success ? result.data : [];
+      const result = await callEdgeFunction("inventory", {}, "GET", 2, true);
+      console.log("✅ [INVENTORY] Inventario obtenido");
+      return result;
     } catch (error) {
-      console.error("[INVENTORY_SERVICE] Error getting inventory:", error);
-      return [];
-    }
-  },
-
-  getById: async (id) => {
-    try {
-      const result = await EdgeFunctions.inventory.getById(id);
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error("[INVENTORY_SERVICE] Error getting product:", error);
-      return null;
-    }
-  },
-
-  create: async (productData) => {
-    try {
-      const result = await EdgeFunctions.inventory.create(productData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error creating product");
-      }
-    } catch (error) {
-      console.error("[INVENTORY_SERVICE] Error creating product:", error);
+      console.error("❌ [INVENTORY] Error obteniendo inventario:", error);
       throw error;
     }
   },
 
-  update: async (id, productData) => {
+  create: async (itemData) => {
+    console.log("📦 [INVENTORY] Creando item...");
     try {
-      const result = await EdgeFunctions.inventory.update(id, productData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error updating product");
-      }
+      const result = await callEdgeFunction(
+        "inventory",
+        itemData,
+        "POST",
+        2,
+        true
+      );
+      console.log("✅ [INVENTORY] Item creado");
+      return result;
     } catch (error) {
-      console.error("[INVENTORY_SERVICE] Error updating product:", error);
+      console.error("❌ [INVENTORY] Error creando item:", error);
+      throw error;
+    }
+  },
+
+  getById: async (id) => {
+    console.log(`📦 [INVENTORY] Obteniendo item ${id}...`);
+    try {
+      const result = await callEdgeFunction(
+        `inventory/${id}`,
+        {},
+        "GET",
+        2,
+        true
+      );
+      console.log("✅ [INVENTORY] Item obtenido");
+      return result;
+    } catch (error) {
+      console.error("❌ [INVENTORY] Error obteniendo item:", error);
+      throw error;
+    }
+  },
+
+  update: async (id, itemData) => {
+    console.log(`📦 [INVENTORY] Actualizando item ${id}...`);
+    try {
+      const result = await callEdgeFunction(
+        `inventory/${id}`,
+        itemData,
+        "PUT",
+        2,
+        true
+      );
+      console.log("✅ [INVENTORY] Item actualizado");
+      return result;
+    } catch (error) {
+      console.error("❌ [INVENTORY] Error actualizando item:", error);
       throw error;
     }
   },
 
   delete: async (id) => {
+    console.log(`📦 [INVENTORY] Eliminando item ${id}...`);
     try {
-      const result = await EdgeFunctions.inventory.delete(id);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error deleting product");
-      }
+      const result = await callEdgeFunction(
+        `inventory/${id}`,
+        {},
+        "DELETE",
+        2,
+        true
+      );
+      console.log("✅ [INVENTORY] Item eliminado");
+      return result;
     } catch (error) {
-      console.error("[INVENTORY_SERVICE] Error deleting product:", error);
+      console.error("❌ [INVENTORY] Error eliminando item:", error);
       throw error;
     }
   },
 };
 
-// ==================== DASHBOARD ====================
-export const dashboardService = {
-  getData: async () => {
-    try {
-      const result = await EdgeFunctions.dashboard.getData();
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error("[DASHBOARD_SERVICE] Error getting dashboard data:", error);
-      return null;
-    }
-  },
-
-  getFinancial: async () => {
-    try {
-      // Usar endpoint específico de dashboard financiero
-      const response = await fetch(
-        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/dashboard/financial`,
-        {
-          headers: {
-            Authorization: `Bearer ${await getAuthToken()}`,
-            apikey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
-          },
-        }
-      );
-      const result = await response.json();
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error("[DASHBOARD_SERVICE] Error getting financial data:", error);
-      return null;
-    }
-  },
-
-  getTrend: async () => {
-    try {
-      const response = await fetch(
-        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/dashboard/trend`,
-        {
-          headers: {
-            Authorization: `Bearer ${await getAuthToken()}`,
-            apikey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
-          },
-        }
-      );
-      const result = await response.json();
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error("[DASHBOARD_SERVICE] Error getting trend data:", error);
-      return null;
-    }
-  },
-
-  getInventory: async () => {
-    try {
-      const response = await fetch(
-        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/dashboard/inventory`,
-        {
-          headers: {
-            Authorization: `Bearer ${await getAuthToken()}`,
-            apikey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
-          },
-        }
-      );
-      const result = await response.json();
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error("[DASHBOARD_SERVICE] Error getting inventory data:", error);
-      return null;
-    }
-  },
-};
-
-// ==================== SERVICES ====================
-export const servicesService = {
-  getAll: async () => {
-    try {
-      const result = await EdgeFunctions.services.getAll();
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error("[SERVICES_SERVICE] Error getting services:", error);
-      return [];
-    }
-  },
-
-  getById: async (id) => {
-    try {
-      const result = await EdgeFunctions.services.getById(id);
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error("[SERVICES_SERVICE] Error getting service:", error);
-      return null;
-    }
-  },
-
-  getAllAdmin: async () => {
-    try {
-      const result = await EdgeFunctions.services.getAllAdmin();
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error("[SERVICES_SERVICE] Error getting admin services:", error);
-      return [];
-    }
-  },
-
-  create: async (serviceData) => {
-    try {
-      const result = await EdgeFunctions.services.create(serviceData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error creating service");
-      }
-    } catch (error) {
-      console.error("[SERVICES_SERVICE] Error creating service:", error);
-      throw error;
-    }
-  },
-
-  update: async (id, serviceData) => {
-    try {
-      const result = await EdgeFunctions.services.update(id, serviceData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error updating service");
-      }
-    } catch (error) {
-      console.error("[SERVICES_SERVICE] Error updating service:", error);
-      throw error;
-    }
-  },
-
-  delete: async (id) => {
-    try {
-      const result = await EdgeFunctions.services.delete(id);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error deleting service");
-      }
-    } catch (error) {
-      console.error("[SERVICES_SERVICE] Error deleting service:", error);
-      throw error;
-    }
-  },
-};
-
-// ==================== EXPENSES ====================
-export const expensesService = {
-  getAll: async () => {
-    try {
-      const result = await EdgeFunctions.expenses.getAll();
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error("[EXPENSES_SERVICE] Error getting expenses:", error);
-      return [];
-    }
-  },
-
-  getById: async (id) => {
-    try {
-      const result = await EdgeFunctions.expenses.getById(id);
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error("[EXPENSES_SERVICE] Error getting expense:", error);
-      return null;
-    }
-  },
-
-  getByMonth: async (year, month) => {
-    try {
-      const result = await EdgeFunctions.expenses.getByMonth(year, month);
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error(
-        "[EXPENSES_SERVICE] Error getting expenses by month:",
-        error
-      );
-      return [];
-    }
-  },
-
-  getPaginated: async (page, limit) => {
-    try {
-      const result = await EdgeFunctions.expenses.getPaginated(page, limit);
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error(
-        "[EXPENSES_SERVICE] Error getting paginated expenses:",
-        error
-      );
-      return [];
-    }
-  },
-
-  create: async (expenseData) => {
-    try {
-      const result = await EdgeFunctions.expenses.create(expenseData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error creating expense");
-      }
-    } catch (error) {
-      console.error("[EXPENSES_SERVICE] Error creating expense:", error);
-      throw error;
-    }
-  },
-
-  update: async (id, expenseData) => {
-    try {
-      const result = await EdgeFunctions.expenses.update(id, expenseData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error updating expense");
-      }
-    } catch (error) {
-      console.error("[EXPENSES_SERVICE] Error updating expense:", error);
-      throw error;
-    }
-  },
-
-  delete: async (id) => {
-    try {
-      const result = await EdgeFunctions.expenses.delete(id);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error deleting expense");
-      }
-    } catch (error) {
-      console.error("[EXPENSES_SERVICE] Error deleting expense:", error);
-      throw error;
-    }
-  },
-};
-
-// ==================== INCOME ====================
-export const incomeService = {
-  getAll: async () => {
-    try {
-      const result = await EdgeFunctions.income.getAll();
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error("[INCOME_SERVICE] Error getting income:", error);
-      return [];
-    }
-  },
-
-  getById: async (id) => {
-    try {
-      const result = await EdgeFunctions.income.getById(id);
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error("[INCOME_SERVICE] Error getting income:", error);
-      return null;
-    }
-  },
-
-  create: async (incomeData) => {
-    try {
-      const result = await EdgeFunctions.income.create(incomeData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error creating income");
-      }
-    } catch (error) {
-      console.error("[INCOME_SERVICE] Error creating income:", error);
-      throw error;
-    }
-  },
-
-  update: async (id, incomeData) => {
-    try {
-      const result = await EdgeFunctions.income.update(id, incomeData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error updating income");
-      }
-    } catch (error) {
-      console.error("[INCOME_SERVICE] Error updating income:", error);
-      throw error;
-    }
-  },
-
-  delete: async (id) => {
-    try {
-      const result = await EdgeFunctions.income.delete(id);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error deleting income");
-      }
-    } catch (error) {
-      console.error("[INCOME_SERVICE] Error deleting income:", error);
-      throw error;
-    }
-  },
-};
-
-// ==================== LEAVES ====================
-export const leavesService = {
-  getAll: async () => {
-    try {
-      const result = await EdgeFunctions.leaves.getAll();
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error("[LEAVES_SERVICE] Error getting leaves:", error);
-      return [];
-    }
-  },
-
-  getById: async (id) => {
-    try {
-      const result = await EdgeFunctions.leaves.getById(id);
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error("[LEAVES_SERVICE] Error getting leave:", error);
-      return null;
-    }
-  },
-
-  create: async (leaveData) => {
-    try {
-      const result = await EdgeFunctions.leaves.create(leaveData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error creating leave");
-      }
-    } catch (error) {
-      console.error("[LEAVES_SERVICE] Error creating leave:", error);
-      throw error;
-    }
-  },
-
-  update: async (id, leaveData) => {
-    try {
-      const result = await EdgeFunctions.leaves.update(id, leaveData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error updating leave");
-      }
-    } catch (error) {
-      console.error("[LEAVES_SERVICE] Error updating leave:", error);
-      throw error;
-    }
-  },
-
-  delete: async (id) => {
-    try {
-      const result = await EdgeFunctions.leaves.delete(id);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error deleting leave");
-      }
-    } catch (error) {
-      console.error("[LEAVES_SERVICE] Error deleting leave:", error);
-      throw error;
-    }
-  },
-};
-
-// ==================== ORDERS ====================
-export const ordersService = {
-  getAll: async () => {
-    try {
-      const result = await EdgeFunctions.orders.getAll();
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error("[ORDERS_SERVICE] Error getting orders:", error);
-      return [];
-    }
-  },
-
-  getById: async (id) => {
-    try {
-      const result = await EdgeFunctions.orders.getById(id);
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error("[ORDERS_SERVICE] Error getting order:", error);
-      return null;
-    }
-  },
-
-  create: async (orderData) => {
-    try {
-      const result = await EdgeFunctions.orders.create(orderData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error creating order");
-      }
-    } catch (error) {
-      console.error("[ORDERS_SERVICE] Error creating order:", error);
-      throw error;
-    }
-  },
-
-  update: async (id, orderData) => {
-    try {
-      const result = await EdgeFunctions.orders.update(id, orderData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error updating order");
-      }
-    } catch (error) {
-      console.error("[ORDERS_SERVICE] Error updating order:", error);
-      throw error;
-    }
-  },
-
-  delete: async (id) => {
-    try {
-      const result = await EdgeFunctions.orders.delete(id);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error deleting order");
-      }
-    } catch (error) {
-      console.error("[ORDERS_SERVICE] Error deleting order:", error);
-      throw error;
-    }
-  },
-};
-
-// ==================== ORDER DETAILS ====================
-export const orderDetailsService = {
-  getAll: async () => {
-    try {
-      const result = await EdgeFunctions.orderDetails.getAll();
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error(
-        "[ORDER_DETAILS_SERVICE] Error getting order details:",
-        error
-      );
-      return [];
-    }
-  },
-
-  getById: async (id) => {
-    try {
-      const result = await EdgeFunctions.orderDetails.getById(id);
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error(
-        "[ORDER_DETAILS_SERVICE] Error getting order detail:",
-        error
-      );
-      return null;
-    }
-  },
-
-  create: async (orderDetailData) => {
-    try {
-      const result = await EdgeFunctions.orderDetails.create(orderDetailData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error creating order detail");
-      }
-    } catch (error) {
-      console.error(
-        "[ORDER_DETAILS_SERVICE] Error creating order detail:",
-        error
-      );
-      throw error;
-    }
-  },
-
-  update: async (id, orderDetailData) => {
-    try {
-      const result = await EdgeFunctions.orderDetails.update(
-        id,
-        orderDetailData
-      );
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error updating order detail");
-      }
-    } catch (error) {
-      console.error(
-        "[ORDER_DETAILS_SERVICE] Error updating order detail:",
-        error
-      );
-      throw error;
-    }
-  },
-
-  delete: async (id) => {
-    try {
-      const result = await EdgeFunctions.orderDetails.delete(id);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error deleting order detail");
-      }
-    } catch (error) {
-      console.error(
-        "[ORDER_DETAILS_SERVICE] Error deleting order detail:",
-        error
-      );
-      throw error;
-    }
-  },
-};
-
-// ==================== SALES ====================
+// 💰 VENTAS - SERVICIO EXPANDIDO
 export const salesService = {
   getAll: async () => {
+    console.log("💰 [SALES] Obteniendo ventas...");
     try {
-      const result = await EdgeFunctions.sales.getAll();
-      return result.success ? result.data : [];
+      const result = await callEdgeFunction("sales", {}, "GET", 2, true);
+      console.log("✅ [SALES] Ventas obtenidas");
+      return result;
     } catch (error) {
-      console.error("[SALES_SERVICE] Error getting sales:", error);
-      return [];
-    }
-  },
-
-  getById: async (id) => {
-    try {
-      const result = await EdgeFunctions.sales.getById(id);
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error("[SALES_SERVICE] Error getting sale:", error);
-      return null;
-    }
-  },
-
-  getByClient: async (clientId) => {
-    try {
-      const result = await EdgeFunctions.sales.getByClient(clientId);
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error("[SALES_SERVICE] Error getting sales by client:", error);
-      return [];
-    }
-  },
-
-  getByEmployee: async (employeeId) => {
-    try {
-      const result = await EdgeFunctions.sales.getByEmployee(employeeId);
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error("[SALES_SERVICE] Error getting sales by employee:", error);
-      return [];
-    }
-  },
-
-  getByDateRange: async (startDate, endDate) => {
-    try {
-      const result = await EdgeFunctions.sales.getByDateRange(
-        startDate,
-        endDate
-      );
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error(
-        "[SALES_SERVICE] Error getting sales by date range:",
-        error
-      );
-      return [];
+      console.error("❌ [SALES] Error obteniendo ventas:", error);
+      throw error;
     }
   },
 
   create: async (saleData) => {
+    console.log("💰 [SALES] Creando venta...");
     try {
-      const result = await EdgeFunctions.sales.create(saleData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error creating sale");
-      }
+      const result = await callEdgeFunction("sales", saleData, "POST", 2, true);
+      console.log("✅ [SALES] Venta creada");
+      return result;
     } catch (error) {
-      console.error("[SALES_SERVICE] Error creating sale:", error);
+      console.error("❌ [SALES] Error creando venta:", error);
+      throw error;
+    }
+  },
+
+  getById: async (id) => {
+    console.log(`💰 [SALES] Obteniendo venta ${id}...`);
+    try {
+      const result = await callEdgeFunction(`sales/${id}`, {}, "GET", 2, true);
+      console.log("✅ [SALES] Venta obtenida");
+      return result;
+    } catch (error) {
+      console.error("❌ [SALES] Error obteniendo venta:", error);
       throw error;
     }
   },
 
   update: async (id, saleData) => {
+    console.log(`💰 [SALES] Actualizando venta ${id}...`);
     try {
-      const result = await EdgeFunctions.sales.update(id, saleData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error updating sale");
-      }
+      const result = await callEdgeFunction(
+        `sales/${id}`,
+        saleData,
+        "PUT",
+        2,
+        true
+      );
+      console.log("✅ [SALES] Venta actualizada");
+      return result;
     } catch (error) {
-      console.error("[SALES_SERVICE] Error updating sale:", error);
+      console.error("❌ [SALES] Error actualizando venta:", error);
+      throw error;
+    }
+  },
+
+  delete: async (id) => {
+    console.log(`💰 [SALES] Eliminando venta ${id}...`);
+    try {
+      const result = await callEdgeFunction(
+        `sales/${id}`,
+        {},
+        "DELETE",
+        2,
+        true
+      );
+      console.log("✅ [SALES] Venta eliminada");
+      return result;
+    } catch (error) {
+      console.error("❌ [SALES] Error eliminando venta:", error);
       throw error;
     }
   },
 
   updateStatus: async (id, status) => {
+    console.log(`💰 [SALES] Actualizando status de venta ${id} a ${status}...`);
     try {
-      const result = await EdgeFunctions.sales.updateStatus(id, status);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error updating sale status");
-      }
-    } catch (error) {
-      console.error("[SALES_SERVICE] Error updating sale status:", error);
-      throw error;
-    }
-  },
-
-  delete: async (id) => {
-    try {
-      const result = await EdgeFunctions.sales.delete(id);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error deleting sale");
-      }
-    } catch (error) {
-      console.error("[SALES_SERVICE] Error deleting sale:", error);
-      throw error;
-    }
-  },
-
-  generateDocument: async (id) => {
-    try {
-      const result = await EdgeFunctions.sales.generateDocument(id);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error generating sale document");
-      }
-    } catch (error) {
-      console.error("[SALES_SERVICE] Error generating sale document:", error);
-      throw error;
-    }
-  },
-
-  updateInventory: async (id) => {
-    try {
-      const result = await EdgeFunctions.sales.updateInventory(id);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error updating inventory");
-      }
-    } catch (error) {
-      console.error("[SALES_SERVICE] Error updating inventory:", error);
-      throw error;
-    }
-  },
-
-  executeDailyClosure: async (date, total, notes) => {
-    try {
-      const result = await EdgeFunctions.sales.executeDailyClosure(
-        date,
-        total,
-        notes
+      const result = await callEdgeFunction(
+        `sales/${id}/status`,
+        { status },
+        "PUT",
+        2,
+        true
       );
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error executing daily closure");
-      }
+      console.log("✅ [SALES] Status actualizado");
+      return result;
     } catch (error) {
-      console.error("[SALES_SERVICE] Error executing daily closure:", error);
+      console.error("❌ [SALES] Error actualizando status:", error);
+      throw error;
+    }
+  },
+
+  getByClient: async (clientId) => {
+    console.log(`💰 [SALES] Obteniendo ventas del cliente ${clientId}...`);
+    try {
+      const result = await callEdgeFunction(
+        `sales/client/${clientId}`,
+        {},
+        "GET",
+        2,
+        true
+      );
+      console.log("✅ [SALES] Ventas del cliente obtenidas");
+      return result;
+    } catch (error) {
+      console.error("❌ [SALES] Error obteniendo ventas del cliente:", error);
+      throw error;
+    }
+  },
+
+  getByEmployee: async (employeeId) => {
+    console.log(`💰 [SALES] Obteniendo ventas del empleado ${employeeId}...`);
+    try {
+      const result = await callEdgeFunction(
+        `sales/employee/${employeeId}`,
+        {},
+        "GET",
+        2,
+        true
+      );
+      console.log("✅ [SALES] Ventas del empleado obtenidas");
+      return result;
+    } catch (error) {
+      console.error("❌ [SALES] Error obteniendo ventas del empleado:", error);
+      throw error;
+    }
+  },
+
+  getByDateRange: async (startDate, endDate) => {
+    console.log(
+      `💰 [SALES] Obteniendo ventas entre ${startDate} y ${endDate}...`
+    );
+    try {
+      const result = await callEdgeFunction(
+        "sales/date-range",
+        { startDate, endDate },
+        "POST",
+        2,
+        true
+      );
+      console.log("✅ [SALES] Ventas por rango de fecha obtenidas");
+      return result;
+    } catch (error) {
+      console.error("❌ [SALES] Error obteniendo ventas por rango:", error);
+      throw error;
+    }
+  },
+
+  generateDocument: async (saleId, documentType = "invoice") => {
+    console.log(
+      `💰 [SALES] Generando documento ${documentType} para venta ${saleId}...`
+    );
+    try {
+      const result = await callEdgeFunction(
+        `sales/${saleId}/document`,
+        { documentType },
+        "POST",
+        2,
+        true
+      );
+      console.log("✅ [SALES] Documento generado");
+      return result;
+    } catch (error) {
+      console.error("❌ [SALES] Error generando documento:", error);
+      throw error;
+    }
+  },
+
+  updateInventory: async (saleId) => {
+    console.log(`💰 [SALES] Actualizando inventario para venta ${saleId}...`);
+    try {
+      const result = await callEdgeFunction(
+        `sales/${saleId}/inventory`,
+        {},
+        "PUT",
+        2,
+        true
+      );
+      console.log("✅ [SALES] Inventario actualizado");
+      return result;
+    } catch (error) {
+      console.error("❌ [SALES] Error actualizando inventario:", error);
+      throw error;
+    }
+  },
+
+  executeDailyClosure: async (date) => {
+    console.log(`💰 [SALES] Ejecutando cierre diario para ${date}...`);
+    try {
+      const result = await callEdgeFunction(
+        "sales/daily-closure",
+        { date },
+        "POST",
+        2,
+        true
+      );
+      console.log("✅ [SALES] Cierre diario ejecutado");
+      return result;
+    } catch (error) {
+      console.error("❌ [SALES] Error en cierre diario:", error);
       throw error;
     }
   },
 
   checkDailyClosure: async (date) => {
+    console.log(`💰 [SALES] Verificando cierre diario para ${date}...`);
     try {
-      const result = await EdgeFunctions.sales.checkDailyClosure(date);
-      return result.success ? result.data : null;
+      const result = await callEdgeFunction(
+        `sales/daily-closure/check`,
+        { date },
+        "GET",
+        2,
+        true
+      );
+      console.log("✅ [SALES] Verificación de cierre completada");
+      return result;
     } catch (error) {
-      console.error("[SALES_SERVICE] Error checking daily closure:", error);
-      return null;
-    }
-  },
-};
-
-// ==================== SETTINGS ====================
-export const settingsService = {
-  getAll: async () => {
-    try {
-      const result = await EdgeFunctions.settings.getAll();
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error("[SETTINGS_SERVICE] Error getting settings:", error);
-      return [];
-    }
-  },
-
-  getById: async (id) => {
-    try {
-      const result = await EdgeFunctions.settings.getById(id);
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error("[SETTINGS_SERVICE] Error getting setting:", error);
-      return null;
-    }
-  },
-
-  create: async (settingData) => {
-    try {
-      const result = await EdgeFunctions.settings.create(settingData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error creating setting");
-      }
-    } catch (error) {
-      console.error("[SETTINGS_SERVICE] Error creating setting:", error);
-      throw error;
-    }
-  },
-
-  update: async (id, settingData) => {
-    try {
-      const result = await EdgeFunctions.settings.update(id, settingData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error updating setting");
-      }
-    } catch (error) {
-      console.error("[SETTINGS_SERVICE] Error updating setting:", error);
+      console.error("❌ [SALES] Error verificando cierre:", error);
       throw error;
     }
   },
 };
 
-// ==================== SHIFTS ====================
-export const shiftsService = {
+// 👤 CLIENTES - SERVICIO EXPANDIDO
+export const clientsService = {
   getAll: async () => {
+    console.log("👤 [CLIENTS] Obteniendo clientes...");
     try {
-      const result = await EdgeFunctions.shifts.getAll();
-      return result.success ? result.data : [];
+      const result = await callEdgeFunction("clients", {}, "GET", 2, true);
+      console.log("✅ [CLIENTS] Clientes obtenidos");
+      return result;
     } catch (error) {
-      console.error("[SHIFTS_SERVICE] Error getting shifts:", error);
-      return [];
+      console.error("❌ [CLIENTS] Error obteniendo clientes:", error);
+      throw error;
+    }
+  },
+
+  create: async (clientData) => {
+    console.log("👤 [CLIENTS] Creando cliente...");
+    try {
+      const result = await callEdgeFunction(
+        "clients",
+        clientData,
+        "POST",
+        2,
+        true
+      );
+      console.log("✅ [CLIENTS] Cliente creado");
+      return result;
+    } catch (error) {
+      console.error("❌ [CLIENTS] Error creando cliente:", error);
+      throw error;
     }
   },
 
   getById: async (id) => {
+    console.log(`👤 [CLIENTS] Obteniendo cliente ${id}...`);
     try {
-      const result = await EdgeFunctions.shifts.getById(id);
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error("[SHIFTS_SERVICE] Error getting shift:", error);
-      return null;
-    }
-  },
-
-  getByDate: async (date) => {
-    try {
-      const result = await EdgeFunctions.shifts.getByDate(date);
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error("[SHIFTS_SERVICE] Error getting shifts by date:", error);
-      return [];
-    }
-  },
-
-  getByMonth: async (year, month) => {
-    try {
-      const result = await EdgeFunctions.shifts.getByMonth(year, month);
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error("[SHIFTS_SERVICE] Error getting shifts by month:", error);
-      return [];
-    }
-  },
-
-  getWithEmployeeInfo: async () => {
-    try {
-      const result = await EdgeFunctions.shifts.getWithEmployeeInfo();
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error(
-        "[SHIFTS_SERVICE] Error getting shifts with employee info:",
-        error
+      const result = await callEdgeFunction(
+        `clients/${id}`,
+        {},
+        "GET",
+        2,
+        true
       );
-      return [];
-    }
-  },
-
-  getMonthlyForExport: async (year, month) => {
-    try {
-      const result = await EdgeFunctions.shifts.getMonthlyForExport(
-        year,
-        month
-      );
-      return result.success ? result.data : [];
+      console.log("✅ [CLIENTS] Cliente obtenido");
+      return result;
     } catch (error) {
-      console.error("[SHIFTS_SERVICE] Error getting shifts for export:", error);
-      return [];
-    }
-  },
-
-  create: async (shiftData) => {
-    try {
-      const result = await EdgeFunctions.shifts.create(shiftData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error creating shift");
-      }
-    } catch (error) {
-      console.error("[SHIFTS_SERVICE] Error creating shift:", error);
+      console.error("❌ [CLIENTS] Error obteniendo cliente:", error);
       throw error;
     }
   },
 
-  save: async (shiftData) => {
+  update: async (id, clientData) => {
+    console.log(`👤 [CLIENTS] Actualizando cliente ${id}...`);
     try {
-      const result = await EdgeFunctions.shifts.save(shiftData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error saving shift");
-      }
+      const result = await callEdgeFunction(
+        `clients/${id}`,
+        clientData,
+        "PUT",
+        2,
+        true
+      );
+      console.log("✅ [CLIENTS] Cliente actualizado");
+      return result;
     } catch (error) {
-      console.error("[SHIFTS_SERVICE] Error saving shift:", error);
-      throw error;
-    }
-  },
-
-  update: async (id, shiftData) => {
-    try {
-      const result = await EdgeFunctions.shifts.update(id, shiftData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error updating shift");
-      }
-    } catch (error) {
-      console.error("[SHIFTS_SERVICE] Error updating shift:", error);
+      console.error("❌ [CLIENTS] Error actualizando cliente:", error);
       throw error;
     }
   },
 
   delete: async (id) => {
+    console.log(`👤 [CLIENTS] Eliminando cliente ${id}...`);
     try {
-      const result = await EdgeFunctions.shifts.delete(id);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error deleting shift");
-      }
-    } catch (error) {
-      console.error("[SHIFTS_SERVICE] Error deleting shift:", error);
-      throw error;
-    }
-  },
-
-  deleteInterval: async (id) => {
-    try {
-      const result = await EdgeFunctions.shifts.deleteInterval(id);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error deleting shift interval");
-      }
-    } catch (error) {
-      console.error("[SHIFTS_SERVICE] Error deleting shift interval:", error);
-      throw error;
-    }
-  },
-
-  copyFromPreviousWeek: async (weekData) => {
-    try {
-      const result = await EdgeFunctions.shifts.copyFromPreviousWeek(weekData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(
-          result.error || "Error copying shifts from previous week"
-        );
-      }
-    } catch (error) {
-      console.error(
-        "[SHIFTS_SERVICE] Error copying shifts from previous week:",
-        error
+      const result = await callEdgeFunction(
+        `clients/${id}`,
+        {},
+        "DELETE",
+        2,
+        true
       );
+      console.log("✅ [CLIENTS] Cliente eliminado");
+      return result;
+    } catch (error) {
+      console.error("❌ [CLIENTS] Error eliminando cliente:", error);
       throw error;
     }
   },
 };
 
-// ==================== SUPPLIERS ====================
-export const suppliersService = {
-  getAll: async () => {
+// 🔧 UTILIDADES Y SALUD DEL SISTEMA
+export const systemService = {
+  healthCheck: async () => {
+    console.log("🔧 [SYSTEM] Verificando salud del sistema...");
     try {
-      const result = await EdgeFunctions.suppliers.getAll();
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error("[SUPPLIERS_SERVICE] Error getting suppliers:", error);
-      return [];
-    }
-  },
-
-  getById: async (id) => {
-    try {
-      const result = await EdgeFunctions.suppliers.getById(id);
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error("[SUPPLIERS_SERVICE] Error getting supplier:", error);
-      return null;
-    }
-  },
-
-  create: async (supplierData) => {
-    try {
-      const result = await EdgeFunctions.suppliers.create(supplierData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error creating supplier");
-      }
-    } catch (error) {
-      console.error("[SUPPLIERS_SERVICE] Error creating supplier:", error);
-      throw error;
-    }
-  },
-
-  update: async (id, supplierData) => {
-    try {
-      const result = await EdgeFunctions.suppliers.update(id, supplierData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error updating supplier");
-      }
-    } catch (error) {
-      console.error("[SUPPLIERS_SERVICE] Error updating supplier:", error);
-      throw error;
-    }
-  },
-
-  delete: async (id) => {
-    try {
-      const result = await EdgeFunctions.suppliers.delete(id);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error deleting supplier");
-      }
-    } catch (error) {
-      console.error("[SUPPLIERS_SERVICE] Error deleting supplier:", error);
-      throw error;
-    }
-  },
-};
-
-// ==================== USERS ====================
-export const usersService = {
-  getAll: async () => {
-    try {
-      const result = await EdgeFunctions.users.getAll();
-      return result.success ? result.data : [];
-    } catch (error) {
-      console.error("[USERS_SERVICE] Error getting users:", error);
-      return [];
-    }
-  },
-
-  getById: async (id) => {
-    try {
-      const result = await EdgeFunctions.users.getById(id);
-      return result.success ? result.data : null;
-    } catch (error) {
-      console.error("[USERS_SERVICE] Error getting user:", error);
-      return null;
-    }
-  },
-
-  create: async (userData) => {
-    try {
-      const result = await EdgeFunctions.users.create(userData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error creating user");
-      }
-    } catch (error) {
-      console.error("[USERS_SERVICE] Error creating user:", error);
-      throw error;
-    }
-  },
-
-  update: async (id, userData) => {
-    try {
-      const result = await EdgeFunctions.users.update(id, userData);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error updating user");
-      }
-    } catch (error) {
-      console.error("[USERS_SERVICE] Error updating user:", error);
-      throw error;
-    }
-  },
-
-  delete: async (id) => {
-    try {
-      const result = await EdgeFunctions.users.delete(id);
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error deleting user");
-      }
-    } catch (error) {
-      console.error("[USERS_SERVICE] Error deleting user:", error);
-      throw error;
-    }
-  },
-};
-
-// ==================== FILES ====================
-export const filesService = {
-  getSignedUrl: async (fileName, bucketName = "media") => {
-    try {
-      const result = await EdgeFunctions.files.getSignedUrl(
-        fileName,
-        bucketName
+      const result = await callEdgeFunction(
+        "system/health",
+        {},
+        "GET",
+        1,
+        false // Health check público
       );
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || "Error getting signed URL");
-      }
+      console.log("✅ [SYSTEM] Sistema saludable");
+      return result;
     } catch (error) {
-      console.error("[FILES_SERVICE] Error getting signed URL:", error);
+      console.error("❌ [SYSTEM] Error en health check:", error);
+      throw error;
+    }
+  },
+
+  getStatus: async () => {
+    console.log("📊 [SYSTEM] Obteniendo estado del sistema...");
+    try {
+      const result = await callEdgeFunction(
+        "system/status",
+        {},
+        "GET",
+        1,
+        false // Status público
+      );
+      console.log("✅ [SYSTEM] Estado obtenido");
+      return result;
+    } catch (error) {
+      console.error("❌ [SYSTEM] Error obteniendo estado:", error);
       throw error;
     }
   },
 };
 
-// Helper function para obtener token
-const getAuthToken = async () => {
-  try {
-    const { supabase } = await import("../config/supabase");
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    return session?.access_token || null;
-  } catch (error) {
-    console.error("Error getting auth token:", error);
-    return null;
-  }
-};
-
-// ==================== EXPORTS ====================
-export default {
+// 📤 SERVICIO CENTRALIZADO DE EXPORTACIÓN
+export const edgeFunctionService = {
   auth: authService,
-  companies: companiesService,
-  alerts: alertsService,
-  clients: clientsService,
-  employees: employeesService,
-  appointments: appointmentsService,
-  inventory: inventoryService,
+  company: companyService,
   dashboard: dashboardService,
-  services: servicesService,
+  employees: employeesService,
+  inventory: inventoryService,
+  sales: salesService,
+  clients: clientsService,
+  system: systemService,
+
+  // 🚀 Método directo para llamadas personalizadas
+  call: callEdgeFunction,
+
+  // 🔍 Helper para debug
+  debugService: async (serviceName) => {
+    console.log(`🔍 [DEBUG] Verificando servicio: ${serviceName}`);
+    const service = edgeFunctionService[serviceName];
+    if (!service) {
+      console.error(`❌ [DEBUG] Servicio no encontrado: ${serviceName}`);
+      return { success: false, error: `Servicio ${serviceName} no existe` };
+    }
+
+    console.log(`✅ [DEBUG] Servicio ${serviceName} está disponible`);
+    return { success: true, service: Object.keys(service) };
+  },
 };
 
-// Exportaciones individuales para compatibilidad
-export {
-  authService as Auth,
-  companiesService as Companies,
-  alertsService as Alerts,
-  clientsService as Clients,
-  employeesService as Employees,
-  appointmentsService as Appointments,
-  inventoryService as Inventory,
-  dashboardService as Dashboard,
-  servicesService as Services,
-};
+// 📤 Export por defecto
+export default edgeFunctionService;

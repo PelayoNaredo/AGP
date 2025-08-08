@@ -73,11 +73,21 @@ const ServicesScreen = forwardRef(
           response = await Services.Data.Services.getAll();
         }
 
-        setServices(response || []);
+        // Normalizar datos - extraer arrays de objetos wrapped
+        let servicesData = [];
+        if (Array.isArray(response)) {
+          servicesData = response;
+        } else if (response && Array.isArray(response.data)) {
+          servicesData = response.data;
+        } else if (response && Array.isArray(response.items)) {
+          servicesData = response.items;
+        }
+
+        setServices(servicesData);
 
         // Extraer categorías únicas de los servicios
         const uniqueCategories = [
-          ...new Set(response.map((service) => service.categoria)),
+          ...new Set(servicesData.map((service) => service.categoria)),
         ].filter(Boolean);
         setCategories(["todos", ...uniqueCategories]);
       } catch (error) {

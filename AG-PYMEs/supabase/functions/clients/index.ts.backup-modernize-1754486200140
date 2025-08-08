@@ -1,0 +1,754 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getUserAndCompanyId } from "../_shared/auth-utils.ts";
+import { withCors, createCorsJsonResponse, createCorsErrorResponse } from "../_shared/cors.ts";
+
+// Configuración de Supabase
+const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+
+// Función para validar datos de cliente
+function validateClientData(data: any, isUpdate = false): string[] {
+  const errors: string[] = [];
+
+  // Campos obligatorios en creación
+  if (!isUpdate) {
+    if (!data.nombre) {
+      errors.push("nombre es obligatorio");
+    }
+  }
+
+  // Validación de nombre
+  if (
+    data.nombre &&
+    (typeof data.nombre !== "string" || data.nombre.trim().length === 0)
+  ) {
+    errors.push("nombre debe ser un texto válido");
+  }
+
+  if (data.nombre && data.nombre.length > 100) {
+    errors.push("nombre no puede exceder 100 caracteres");
+  }
+
+  // Validación de email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (data.email && !emailRegex.test(data.email)) {
+    errors.push("email debe ser una dirección válida");
+  }
+
+  // Validación de teléfono
+  if (data.telefono && data.telefono.length > 20) {
+    errors.push("telefono no puede exceder 20 caracteres");
+  }
+
+  // Validación de dirección
+  if (data.direccion && data.direccion.length > 200) {
+    errors.push("direccion no puede exceder 200 caracteres");
+  }
+
+  // Validación de empresa
+  if (data.empresa && data.empresa.length > 150) {
+    errors.push("empresa no puede exceder 150 caracteres");
+  }
+
+  // Validación de tipo de cliente
+  const tiposCliente = ["individual", "empresa", "gobierno", "ong"];
+  if (data.tipo_cliente && !tiposCliente.includes(data.tipo_cliente)) {
+    errors.push(`tipo_cliente debe ser uno de: ${tiposCliente.join(", ")}`);
+  }
+
+  // Validación de estado
+  const estadosValidos = ["activo", "inactivo", "prospecto", "perdido"];
+  if (data.estado && !estadosValidos.includes(data.estado)) {
+    errors.push(`estado debe ser uno de: ${estadosValidos.join(", ")}`);
+  }
+
+  // Validación de origen
+  const origenesValidos = [
+    "web",
+    "referencia",
+    "publicidad",
+    "redes_sociales",
+    "telefono",
+    "otros",
+  ];
+  if (data.origen && !origenesValidos.includes(data.origen)) {
+    errors.push(`origen debe ser uno de: ${origenesValidos.join(", ")}`);
+  }
+
+  return errors;
+}
+
+async function handleSecureRoute(req: Request) {
+  const url = new URL(req.url);
+  const pathSegments = url.pathname.split("/").filter((segment) => segment);
+  const searchParams = url.searchParams;
+
+  // Autenticación y autorización
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader) {
+    return createCorsErrorResponse("Token de autorización requerido", 401);
+  }
+
+  const { companyId, error: authError } = await getUserAndCompanyId(
+    authHeader.replace("Bearer ", "")
+  );
+  if (authError || !companyId) {
+    return new Response(
+      JSON.stringify({
+        error: authError || "Company ID no encontrado en el token",
+      }),
+      {
+        status: 401,
+
+      }
+    );
+  }
+
+  // Rutas para clients
+  if (req.method === "GET") {
+    // GET /clients?status=activo - Obtener clientes por estado
+    if (pathSegments.length === 0 && searchParams.has("status")) {
+      const status = searchParams.get("status")!;
+
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("clients")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("estado", status)
+          .order("nombre", { ascending: true });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener clientes por estado:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener clientes por estado",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /clients?type=empresa - Obtener clientes por tipo
+    if (pathSegments.length === 0 && searchParams.has("type")) {
+      const type = searchParams.get("type")!;
+
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("clients")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("tipo_cliente", type)
+          .order("nombre", { ascending: true });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener clientes por tipo:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener clientes por tipo",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /clients?search=nombre - Buscar clientes
+    if (pathSegments.length === 0 && searchParams.has("search")) {
+      const searchTerm = searchParams.get("search")!;
+
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("clients")
+          .select("*")
+          .eq("company_id", companyId)
+          .or(
+            `nombre.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,empresa.ilike.%${searchTerm}%`
+          )
+          .order("nombre", { ascending: true });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al buscar clientes:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al buscar clientes",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /clients/active - Obtener clientes activos
+    if (pathSegments.length === 1 && pathSegments[0] === "active") {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("clients")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("estado", "activo")
+          .order("nombre", { ascending: true });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener clientes activos:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener clientes activos",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /clients/prospects - Obtener prospectos
+    if (pathSegments.length === 1 && pathSegments[0] === "prospects") {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("clients")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("estado", "prospecto")
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener prospectos:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener prospectos",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /clients/stats - Obtener estadísticas de clientes
+    if (pathSegments.length === 1 && pathSegments[0] === "stats") {
+      try {
+        const { data: clientsData, error } = await supabaseAdmin
+          .from("clients")
+          .select("estado, tipo_cliente, origen")
+          .eq("company_id", companyId);
+
+        if (error) throw error;
+
+        // Procesar estadísticas
+        const stats = {
+          general: {
+            total_clientes: clientsData.length,
+            clientes_activos: clientsData.filter(
+              (client) => client.estado === "activo"
+            ).length,
+            prospectos: clientsData.filter(
+              (client) => client.estado === "prospecto"
+            ).length,
+            inactivos: clientsData.filter(
+              (client) => client.estado === "inactivo"
+            ).length,
+          },
+          por_estado: {} as any,
+          por_tipo: {} as any,
+          por_origen: {} as any,
+        };
+
+        // Agrupar por estado
+        clientsData.forEach((client) => {
+          const estado = client.estado || "sin_especificar";
+          stats.por_estado[estado] = (stats.por_estado[estado] || 0) + 1;
+        });
+
+        // Agrupar por tipo
+        clientsData.forEach((client) => {
+          const tipo = client.tipo_cliente || "sin_especificar";
+          stats.por_tipo[tipo] = (stats.por_tipo[tipo] || 0) + 1;
+        });
+
+        // Agrupar por origen
+        clientsData.forEach((client) => {
+          const origen = client.origen || "sin_especificar";
+          stats.por_origen[origen] = (stats.por_origen[origen] || 0) + 1;
+        });
+
+        return createCorsJsonResponse(stats, 200);
+      } catch (error: any) {
+        console.error("Error al obtener estadísticas:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener estadísticas",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /clients - Obtener todos los clientes
+    if (pathSegments.length === 0) {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("clients")
+          .select("*")
+          .eq("company_id", companyId)
+          .order("nombre", { ascending: true });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener clientes:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener clientes",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /clients/:id - Obtener cliente por ID
+    if (
+      pathSegments.length === 1 &&
+      !["active", "prospects", "stats"].includes(pathSegments[0])
+    ) {
+      const clientId = pathSegments[0];
+
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("clients")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("id_cliente", clientId)
+          .single();
+
+        if (error) {
+          if (error.code === "PGRST116") {
+            return createCorsErrorResponse("Cliente no encontrado", 404);
+          }
+          throw error;
+        }
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener cliente:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener cliente",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+  }
+
+  if (req.method === "POST") {
+    // POST /clients - Crear nuevo cliente
+    if (pathSegments.length === 0) {
+      try {
+        const clientData = await req.json();
+
+        // Validar datos
+        const validationErrors = validateClientData(clientData);
+        if (validationErrors.length > 0) {
+          return new Response(
+            JSON.stringify({
+              error: "Datos inválidos",
+              details: validationErrors,
+            }),
+            {
+              status: 400,
+
+            }
+          );
+        }
+
+        // Verificar que el email no esté en uso en la empresa (si se proporciona)
+        if (clientData.email) {
+          const { data: existingClient } = await supabaseAdmin
+            .from("clients")
+            .select("id_cliente")
+            .eq("company_id", companyId)
+            .eq("email", clientData.email)
+            .single();
+
+          if (existingClient) {
+            return new Response(
+              JSON.stringify({
+                error: "Ya existe un cliente con este email en la empresa",
+              }),
+              {
+                status: 400,
+
+              }
+            );
+          }
+        }
+
+        // Preparar datos para inserción
+        const insertData = {
+          company_id: companyId,
+          nombre: clientData.nombre,
+          email: clientData.email || null,
+          telefono: clientData.telefono || null,
+          direccion: clientData.direccion || null,
+          empresa: clientData.empresa || null,
+          tipo_cliente: clientData.tipo_cliente || "individual",
+          estado: clientData.estado || "prospecto",
+          origen: clientData.origen || "otros",
+          notas: clientData.notas || null,
+          fecha_primer_contacto:
+            clientData.fecha_primer_contacto ||
+            new Date().toISOString().split("T")[0],
+          documento_identidad: clientData.documento_identidad || null,
+          ciudad: clientData.ciudad || null,
+          pais: clientData.pais || null,
+          codigo_postal: clientData.codigo_postal || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        const { data, error } = await supabaseAdmin
+          .from("clients")
+          .insert(insertData)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 201);
+      } catch (error: any) {
+        console.error("Error al crear cliente:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al crear cliente",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+  }
+
+  if (req.method === "PUT") {
+    // PUT /clients/:id - Actualizar cliente
+    if (pathSegments.length === 1) {
+      const clientId = pathSegments[0];
+
+      try {
+        const clientData = await req.json();
+
+        // Validar datos
+        const validationErrors = validateClientData(clientData, true);
+        if (validationErrors.length > 0) {
+          return new Response(
+            JSON.stringify({
+              error: "Datos inválidos",
+              details: validationErrors,
+            }),
+            {
+              status: 400,
+
+            }
+          );
+        }
+
+        // Verificar que el cliente existe y pertenece a la empresa
+        const { data: existingClient } = await supabaseAdmin
+          .from("clients")
+          .select("id_cliente, email")
+          .eq("company_id", companyId)
+          .eq("id_cliente", clientId)
+          .single();
+
+        if (!existingClient) {
+          return createCorsErrorResponse("Cliente no encontrado", 404);
+        }
+
+        // Si se actualiza el email, verificar que no esté en uso por otro cliente
+        if (clientData.email && clientData.email !== existingClient.email) {
+          const { data: emailInUse } = await supabaseAdmin
+            .from("clients")
+            .select("id_cliente")
+            .eq("company_id", companyId)
+            .eq("email", clientData.email)
+            .neq("id_cliente", clientId)
+            .single();
+
+          if (emailInUse) {
+            return new Response(
+              JSON.stringify({
+                error: "Este email ya está en uso por otro cliente",
+              }),
+              {
+                status: 400,
+
+              }
+            );
+          }
+        }
+
+        // Preparar datos para actualización
+        const updateData: any = {
+          updated_at: new Date().toISOString(),
+        };
+
+        if (clientData.nombre !== undefined) {
+          updateData.nombre = clientData.nombre;
+        }
+        if (clientData.email !== undefined) {
+          updateData.email = clientData.email || null;
+        }
+        if (clientData.telefono !== undefined) {
+          updateData.telefono = clientData.telefono || null;
+        }
+        if (clientData.direccion !== undefined) {
+          updateData.direccion = clientData.direccion || null;
+        }
+        if (clientData.empresa !== undefined) {
+          updateData.empresa = clientData.empresa || null;
+        }
+        if (clientData.tipo_cliente !== undefined) {
+          updateData.tipo_cliente = clientData.tipo_cliente;
+        }
+        if (clientData.estado !== undefined) {
+          updateData.estado = clientData.estado;
+        }
+        if (clientData.origen !== undefined) {
+          updateData.origen = clientData.origen;
+        }
+        if (clientData.notas !== undefined) {
+          updateData.notas = clientData.notas || null;
+        }
+        if (clientData.fecha_primer_contacto !== undefined) {
+          updateData.fecha_primer_contacto = clientData.fecha_primer_contacto;
+        }
+        if (clientData.documento_identidad !== undefined) {
+          updateData.documento_identidad =
+            clientData.documento_identidad || null;
+        }
+        if (clientData.ciudad !== undefined) {
+          updateData.ciudad = clientData.ciudad || null;
+        }
+        if (clientData.pais !== undefined) {
+          updateData.pais = clientData.pais || null;
+        }
+        if (clientData.codigo_postal !== undefined) {
+          updateData.codigo_postal = clientData.codigo_postal || null;
+        }
+
+        const { data, error } = await supabaseAdmin
+          .from("clients")
+          .update(updateData)
+          .eq("id_cliente", clientId)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al actualizar cliente:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al actualizar cliente",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // PUT /clients/:id/status - Cambiar estado del cliente
+    if (pathSegments.length === 2 && pathSegments[1] === "status") {
+      const clientId = pathSegments[0];
+
+      try {
+        const { status } = await req.json();
+
+        const estadosValidos = ["activo", "inactivo", "prospecto", "perdido"];
+        if (!estadosValidos.includes(status)) {
+          return new Response(
+            JSON.stringify({
+              error: `Estado inválido. Debe ser uno de: ${estadosValidos.join(", ")}`,
+            }),
+            {
+              status: 400,
+
+            }
+          );
+        }
+
+        // Verificar que el cliente existe y pertenece a la empresa
+        const { data: existingClient } = await supabaseAdmin
+          .from("clients")
+          .select("id_cliente")
+          .eq("company_id", companyId)
+          .eq("id_cliente", clientId)
+          .single();
+
+        if (!existingClient) {
+          return createCorsErrorResponse("Cliente no encontrado", 404);
+        }
+
+        const { data, error } = await supabaseAdmin
+          .from("clients")
+          .update({
+            estado: status,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id_cliente", clientId)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al cambiar estado del cliente:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al cambiar estado del cliente",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+  }
+
+  if (req.method === "DELETE") {
+    // DELETE /clients/:id - Eliminar cliente
+    if (pathSegments.length === 1) {
+      const clientId = pathSegments[0];
+
+      try {
+        // Verificar que el cliente existe y pertenece a la empresa
+        const { data: existingClient } = await supabaseAdmin
+          .from("clients")
+          .select("id_cliente")
+          .eq("company_id", companyId)
+          .eq("id_cliente", clientId)
+          .single();
+
+        if (!existingClient) {
+          return createCorsErrorResponse("Cliente no encontrado", 404);
+        }
+
+        // En lugar de eliminar completamente, cambiar estado a inactivo por integridad referencial
+        const { data, error } = await supabaseAdmin
+          .from("clients")
+          .update({
+            estado: "inactivo",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id_cliente", clientId)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        return new Response(
+          JSON.stringify({
+            message: "Cliente marcado como inactivo correctamente",
+            client: data,
+          }),
+          {
+            status: 200,
+
+          }
+        );
+      } catch (error: any) {
+        console.error("Error al desactivar cliente:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al desactivar cliente",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+  }
+
+  // Ruta no encontrada
+  return createCorsErrorResponse("Endpoint no encontrado", 404);
+}
+
+serve(withCors(async (req) => {
+  // Manejar preflight CORS
+  if (req.method === "OPTIONS") {
+    return new Response("ok");
+  }
+
+  try {
+    return await handleSecureRoute(req);
+  } catch (error: any) {
+    console.error("Error en clients EdgeFunction:", error);
+    return new Response(
+      JSON.stringify({
+        error: "Error interno del servidor",
+        details: error.message,
+      }),
+      {
+        status: 500,
+
+      }
+    );
+  }
+}));

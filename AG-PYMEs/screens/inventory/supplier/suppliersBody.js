@@ -17,6 +17,7 @@ import { Services } from "../../../api/index";
 import SupplierModal from "./supplierModal";
 import SupplierCard from "./supplierCard";
 import useNotifications from "../../../hooks/useNotifications";
+import { normalizeAPIResponse } from "../../../utils/helpers";
 
 // Componente SuppliersBody para gestionar y visualizar proveedores
 const SuppliersBody = forwardRef(({ searchQuery = "" }, ref) => {
@@ -37,7 +38,8 @@ const SuppliersBody = forwardRef(({ searchQuery = "" }, ref) => {
   const loadSuppliers = async () => {
     try {
       const data = await Services.Data.Suppliers.getAll();
-      setSuppliers(data);
+      const normalizedData = normalizeAPIResponse(data);
+      setSuppliers(normalizedData);
     } catch (error) {
       showError("Error", "Error cargando proveedores");
     } finally {

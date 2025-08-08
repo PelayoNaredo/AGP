@@ -1,0 +1,14 @@
+{
+  "name": "extract-db-functions",
+  "version": "1.0.0",
+  "description": "Extrae funciones y triggers de Supabase",
+  "main": "extract-db-functions.js",
+  "scripts": {
+    "extract": "node extract-db-functions.js",
+    "extract-with-cli": "node extract-db-functions.js --use-cli"
+  },
+  "dependencies": {
+    "fs": "^0.0.1-security",
+    "path": "^0.12.7"
+  }
+}

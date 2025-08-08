@@ -53,12 +53,26 @@ const ProductsScreen = forwardRef(
             Services.Data.Suppliers.getAll(),
           ]);
 
-          setProducts(inventoryData);
+          // Normalizar datos - extraer arrays de objetos wrapped
+          const normalizeData = (data) => {
+            if (Array.isArray(data)) return data;
+            if (data && Array.isArray(data.data)) return data.data;
+            if (data && Array.isArray(data.items)) return data.items;
+            return [];
+          };
 
-          const suppliersMapping = suppliersData.reduce((acc, supplier) => {
-            acc[supplier.id_proveedor] = supplier.nombre_proveedor;
-            return acc;
-          }, {});
+          const normalizedProducts = normalizeData(inventoryData);
+          const normalizedSuppliers = normalizeData(suppliersData);
+
+          setProducts(normalizedProducts);
+
+          const suppliersMapping = normalizedSuppliers.reduce(
+            (acc, supplier) => {
+              acc[supplier.id_proveedor] = supplier.nombre_proveedor;
+              return acc;
+            },
+            {}
+          );
           setSuppliersMap(suppliersMapping);
         } catch (err) {
           setError(err.message);

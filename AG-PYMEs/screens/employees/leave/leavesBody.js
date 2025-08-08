@@ -17,6 +17,7 @@ import SearchHeaderBar from "../../../components/searchHeaderBar";
 import LeaveModal from "./leaveModal";
 import { Services } from "../../../api/index";
 import useNotifications from "../../../hooks/useNotifications";
+import { normalizeAPIResponse } from "../../../utils/helpers";
 
 // Componente LeavesBody para gestionar las bajas de empleados
 // Este componente muestra una lista de bajas y permite crear, editar y eliminar bajas
@@ -62,8 +63,21 @@ const LeavesBody = forwardRef(
           Services.Data.Leaves.getAll(),
         ]);
 
-        setEmployees(employeesData);
-        setLeaves(leavesData);
+        // 🛡️ NORMALIZAR DATOS DE API PARA EVITAR ERRORES DE .filter()
+        const normalizedEmployees = normalizeAPIResponse(employeesData, []);
+        const normalizedLeaves = normalizeAPIResponse(leavesData, []);
+
+        console.log("📊 [LeavesBody] Normalized data:", {
+          employees: Array.isArray(normalizedEmployees)
+            ? normalizedEmployees.length
+            : "NOT_ARRAY",
+          leaves: Array.isArray(normalizedLeaves)
+            ? normalizedLeaves.length
+            : "NOT_ARRAY",
+        });
+
+        setEmployees(normalizedEmployees);
+        setLeaves(normalizedLeaves);
       } catch (error) {
         console.error("Error cargando datos:", error);
         showError("Error", "No se pudieron cargar los datos");
@@ -292,7 +306,7 @@ const LeavesBody = forwardRef(
         </ScrollView>
         <LeaveModal
           visible={showModal}
-          employees={employees.filter(
+          employees={(Array.isArray(employees) ? employees : []).filter(
             (e) => e.activo || leaveToEdit?.id_empleado === e.id_empleado
           )}
           onClose={() => {

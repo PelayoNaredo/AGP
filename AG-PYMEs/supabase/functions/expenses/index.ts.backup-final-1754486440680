@@ -1,0 +1,782 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getUserAndCompanyId } from "../_shared/auth-utils.ts";
+import { withCors, createCorsJsonResponse, createCorsErrorResponse } from "../_shared/cors.ts";
+
+// Configuración de Supabase
+const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+
+// Función para validar datos de gasto
+function validateExpenseData(data: any, isUpdate = false): string[] {
+  const errors: string[] = [];
+
+  // Campos obligatorios en creación
+  if (!isUpdate) {
+    if (!data.concepto) {
+      errors.push("concepto es obligatorio");
+    }
+
+    if (data.gastos === undefined || data.gastos === null) {
+      errors.push("gastos es obligatorio");
+    }
+  }
+
+  // Validación de concepto
+  if (
+    data.concepto &&
+    (typeof data.concepto !== "string" || data.concepto.trim().length === 0)
+  ) {
+    errors.push("concepto debe ser un texto válido");
+  }
+
+  if (data.concepto && data.concepto.length > 200) {
+    errors.push("concepto no puede exceder 200 caracteres");
+  }
+
+  // Validación de gastos
+  if (
+    data.gastos !== undefined &&
+    (isNaN(parseFloat(data.gastos)) || parseFloat(data.gastos) < 0)
+  ) {
+    errors.push("gastos debe ser un número positivo");
+  }
+
+  // Validación de fecha
+  if (data.fecha && !isValidDate(data.fecha)) {
+    errors.push("fecha debe ser una fecha válida");
+  }
+
+  // Validación de categoría
+  const categoriasValidas = [
+    "oficina",
+    "marketing",
+    "viajes",
+    "equipamiento",
+    "servicios",
+    "impuestos",
+    "personal",
+    "mantenimiento",
+    "otros",
+  ];
+  if (data.categoria && !categoriasValidas.includes(data.categoria)) {
+    errors.push(`categoria debe ser una de: ${categoriasValidas.join(", ")}`);
+  }
+
+  // Validación de método de pago
+  const metodosPago = [
+    "efectivo",
+    "transferencia",
+    "tarjeta",
+    "cheque",
+    "paypal",
+    "otros",
+  ];
+  if (data.metodo_pago && !metodosPago.includes(data.metodo_pago)) {
+    errors.push(`metodo_pago debe ser uno de: ${metodosPago.join(", ")}`);
+  }
+
+  // Validación de estado
+  const estadosValidos = ["pendiente", "pagado", "vencido", "cancelado"];
+  if (data.estado && !estadosValidos.includes(data.estado)) {
+    errors.push(`estado debe ser uno de: ${estadosValidos.join(", ")}`);
+  }
+
+  return errors;
+}
+
+// Función auxiliar para validar fechas
+function isValidDate(dateString: string): boolean {
+  const date = new Date(dateString);
+  return date instanceof Date && !isNaN(date.getTime());
+}
+
+async function handleSecureRoute(req: Request) {
+  const url = new URL(req.url);
+  const pathSegments = url.pathname.split("/").filter((segment) => segment);
+  const searchParams = url.searchParams;
+
+  // Autenticación y autorización
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader) {
+    return createCorsErrorResponse("Token de autorización requerido", 401);
+  }
+
+  const { companyId, error: authError } = await getUserAndCompanyId(
+    authHeader.replace("Bearer ", "")
+  );
+  if (authError || !companyId) {
+    return new Response(
+      JSON.stringify({
+        error: authError || "Company ID no encontrado en el token",
+      }),
+      {
+        status: 401,
+
+      }
+    );
+  }
+
+  // Rutas para expenses
+  if (req.method === "GET") {
+    // GET /expenses?category=oficina - Obtener gastos por categoría
+    if (pathSegments.length === 0 && searchParams.has("category")) {
+      const category = searchParams.get("category")!;
+
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("expenses")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("categoria", category)
+          .order("fecha", { ascending: false });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener gastos por categoría:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener gastos por categoría",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /expenses?status=pendiente - Obtener gastos por estado
+    if (pathSegments.length === 0 && searchParams.has("status")) {
+      const status = searchParams.get("status")!;
+
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("expenses")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("estado", status)
+          .order("fecha", { ascending: false });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener gastos por estado:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener gastos por estado",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /expenses?month=2025-08 - Obtener gastos por mes
+    if (pathSegments.length === 0 && searchParams.has("month")) {
+      const month = searchParams.get("month")!;
+
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("expenses")
+          .select("*")
+          .eq("company_id", companyId)
+          .gte("fecha", `${month}-01`)
+          .lt("fecha", `${month}-32`)
+          .order("fecha", { ascending: false });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener gastos por mes:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener gastos por mes",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /expenses?dateFrom=X&dateTo=Y - Obtener gastos por rango de fechas
+    if (
+      pathSegments.length === 0 &&
+      searchParams.has("dateFrom") &&
+      searchParams.has("dateTo")
+    ) {
+      const dateFrom = searchParams.get("dateFrom")!;
+      const dateTo = searchParams.get("dateTo")!;
+
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("expenses")
+          .select("*")
+          .eq("company_id", companyId)
+          .gte("fecha", dateFrom)
+          .lte("fecha", dateTo)
+          .order("fecha", { ascending: false });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener gastos por rango:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener gastos por rango",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /expenses/pending - Obtener gastos pendientes
+    if (pathSegments.length === 1 && pathSegments[0] === "pending") {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("expenses")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("estado", "pendiente")
+          .order("fecha", { ascending: true });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener gastos pendientes:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener gastos pendientes",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /expenses/overdue - Obtener gastos vencidos
+    if (pathSegments.length === 1 && pathSegments[0] === "overdue") {
+      try {
+        const today = new Date().toISOString().split("T")[0];
+
+        const { data, error } = await supabaseAdmin
+          .from("expenses")
+          .select("*")
+          .eq("company_id", companyId)
+          .in("estado", ["pendiente", "vencido"])
+          .lt("fecha_vencimiento", today)
+          .order("fecha_vencimiento", { ascending: true });
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener gastos vencidos:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener gastos vencidos",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /expenses/stats - Obtener estadísticas de gastos
+    if (pathSegments.length === 1 && pathSegments[0] === "stats") {
+      try {
+        const period = searchParams.get("period") || "month";
+        const validPeriods = ["week", "month", "quarter", "year"];
+
+        if (!validPeriods.includes(period)) {
+          return new Response(
+            JSON.stringify({
+              error: "Período inválido. Debe ser: week, month, quarter, year",
+            }),
+            {
+              status: 400,
+
+            }
+          );
+        }
+
+        // Calcular fecha de inicio según el período
+        const now = new Date();
+        let startDate: Date;
+
+        switch (period) {
+          case "week":
+            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            break;
+          case "month":
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            break;
+          case "quarter":
+            const quarter = Math.floor(now.getMonth() / 3);
+            startDate = new Date(now.getFullYear(), quarter * 3, 1);
+            break;
+          case "year":
+            startDate = new Date(now.getFullYear(), 0, 1);
+            break;
+          default:
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        }
+
+        const { data: expenseData, error } = await supabaseAdmin
+          .from("expenses")
+          .select("gastos, categoria, metodo_pago, estado")
+          .eq("company_id", companyId)
+          .gte("fecha", startDate.toISOString().split("T")[0]);
+
+        if (error) throw error;
+
+        // Procesar estadísticas
+        const stats = {
+          general: {
+            total_gastos: expenseData.reduce(
+              (sum, expense) => sum + parseFloat(expense.gastos || 0),
+              0
+            ),
+            numero_registros: expenseData.length,
+            promedio: 0,
+            maximo: 0,
+            minimo: 0,
+          },
+          por_categoria: {} as any,
+          por_metodo_pago: {} as any,
+          por_estado: {} as any,
+        };
+
+        if (expenseData.length > 0) {
+          const importes = expenseData.map((expense) =>
+            parseFloat(expense.gastos || 0)
+          );
+          stats.general.promedio =
+            stats.general.total_gastos / expenseData.length;
+          stats.general.maximo = Math.max(...importes);
+          stats.general.minimo = Math.min(...importes);
+
+          // Agrupar por categoría
+          expenseData.forEach((expense) => {
+            const categoria = expense.categoria || "sin_categoria";
+            if (!stats.por_categoria[categoria]) {
+              stats.por_categoria[categoria] = { cantidad: 0, total: 0 };
+            }
+            stats.por_categoria[categoria].cantidad++;
+            stats.por_categoria[categoria].total += parseFloat(
+              expense.gastos || 0
+            );
+          });
+
+          // Agrupar por método de pago
+          expenseData.forEach((expense) => {
+            const metodo = expense.metodo_pago || "sin_especificar";
+            if (!stats.por_metodo_pago[metodo]) {
+              stats.por_metodo_pago[metodo] = { cantidad: 0, total: 0 };
+            }
+            stats.por_metodo_pago[metodo].cantidad++;
+            stats.por_metodo_pago[metodo].total += parseFloat(
+              expense.gastos || 0
+            );
+          });
+
+          // Agrupar por estado
+          expenseData.forEach((expense) => {
+            const estado = expense.estado || "sin_especificar";
+            if (!stats.por_estado[estado]) {
+              stats.por_estado[estado] = { cantidad: 0, total: 0 };
+            }
+            stats.por_estado[estado].cantidad++;
+            stats.por_estado[estado].total += parseFloat(expense.gastos || 0);
+          });
+        }
+
+        return createCorsJsonResponse(stats, 200);
+      } catch (error: any) {
+        console.error("Error al obtener estadísticas:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener estadísticas",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /expenses - Obtener todos los gastos
+    if (pathSegments.length === 0) {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("expenses")
+          .select("*")
+          .eq("company_id", companyId)
+          .order("fecha", { ascending: false })
+          .limit(100);
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener gastos:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener gastos",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // GET /expenses/:id - Obtener gasto por ID
+    if (
+      pathSegments.length === 1 &&
+      !["pending", "overdue", "stats"].includes(pathSegments[0])
+    ) {
+      const expenseId = pathSegments[0];
+
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("expenses")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("id_gasto", expenseId)
+          .single();
+
+        if (error) {
+          if (error.code === "PGRST116") {
+            return createCorsErrorResponse("Gasto no encontrado", 404);
+          }
+          throw error;
+        }
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al obtener gasto:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener gasto",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+  }
+
+  if (req.method === "POST") {
+    // POST /expenses - Crear nuevo gasto
+    if (pathSegments.length === 0) {
+      try {
+        const expenseData = await req.json();
+
+        // Validar datos
+        const validationErrors = validateExpenseData(expenseData);
+        if (validationErrors.length > 0) {
+          return new Response(
+            JSON.stringify({
+              error: "Datos inválidos",
+              details: validationErrors,
+            }),
+            {
+              status: 400,
+
+            }
+          );
+        }
+
+        // Preparar datos para inserción
+        const insertData = {
+          company_id: companyId,
+          concepto: expenseData.concepto,
+          descripcion: expenseData.descripcion || null,
+          gastos: parseFloat(expenseData.gastos),
+          fecha: expenseData.fecha || new Date().toISOString().split("T")[0],
+          categoria: expenseData.categoria || "otros",
+          metodo_pago: expenseData.metodo_pago || "efectivo",
+          estado: expenseData.estado || "pendiente",
+          proveedor: expenseData.proveedor || null,
+          referencia: expenseData.referencia || null,
+          fecha_vencimiento: expenseData.fecha_vencimiento || null,
+          recurrente: expenseData.recurrente || false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        const { data, error } = await supabaseAdmin
+          .from("expenses")
+          .insert(insertData)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 201);
+      } catch (error: any) {
+        console.error("Error al crear gasto:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al crear gasto",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+
+    // POST /expenses/:id/pay - Marcar gasto como pagado
+    if (pathSegments.length === 2 && pathSegments[1] === "pay") {
+      const expenseId = pathSegments[0];
+
+      try {
+        // Verificar que el gasto existe y pertenece a la empresa
+        const { data: existingExpense } = await supabaseAdmin
+          .from("expenses")
+          .select("id_gasto, estado")
+          .eq("company_id", companyId)
+          .eq("id_gasto", expenseId)
+          .single();
+
+        if (!existingExpense) {
+          return createCorsErrorResponse("Gasto no encontrado", 404);
+        }
+
+        if (existingExpense.estado === "pagado") {
+          return createCorsErrorResponse("El gasto ya está marcado como pagado", 400);
+        }
+
+        const { data, error } = await supabaseAdmin
+          .from("expenses")
+          .update({
+            estado: "pagado",
+            fecha_pago: new Date().toISOString().split("T")[0],
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id_gasto", expenseId)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al marcar gasto como pagado:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al marcar gasto como pagado",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+  }
+
+  if (req.method === "PUT") {
+    // PUT /expenses/:id - Actualizar gasto
+    if (pathSegments.length === 1) {
+      const expenseId = pathSegments[0];
+
+      try {
+        const expenseData = await req.json();
+
+        // Validar datos
+        const validationErrors = validateExpenseData(expenseData, true);
+        if (validationErrors.length > 0) {
+          return new Response(
+            JSON.stringify({
+              error: "Datos inválidos",
+              details: validationErrors,
+            }),
+            {
+              status: 400,
+
+            }
+          );
+        }
+
+        // Verificar que el gasto existe y pertenece a la empresa
+        const { data: existingExpense } = await supabaseAdmin
+          .from("expenses")
+          .select("id_gasto")
+          .eq("company_id", companyId)
+          .eq("id_gasto", expenseId)
+          .single();
+
+        if (!existingExpense) {
+          return createCorsErrorResponse("Gasto no encontrado", 404);
+        }
+
+        // Preparar datos para actualización
+        const updateData: any = {
+          updated_at: new Date().toISOString(),
+        };
+
+        if (expenseData.concepto !== undefined) {
+          updateData.concepto = expenseData.concepto;
+        }
+        if (expenseData.descripcion !== undefined) {
+          updateData.descripcion = expenseData.descripcion || null;
+        }
+        if (expenseData.gastos !== undefined) {
+          updateData.gastos = parseFloat(expenseData.gastos);
+        }
+        if (expenseData.fecha !== undefined) {
+          updateData.fecha = expenseData.fecha;
+        }
+        if (expenseData.categoria !== undefined) {
+          updateData.categoria = expenseData.categoria;
+        }
+        if (expenseData.metodo_pago !== undefined) {
+          updateData.metodo_pago = expenseData.metodo_pago;
+        }
+        if (expenseData.estado !== undefined) {
+          updateData.estado = expenseData.estado;
+        }
+        if (expenseData.proveedor !== undefined) {
+          updateData.proveedor = expenseData.proveedor || null;
+        }
+        if (expenseData.referencia !== undefined) {
+          updateData.referencia = expenseData.referencia || null;
+        }
+        if (expenseData.fecha_vencimiento !== undefined) {
+          updateData.fecha_vencimiento = expenseData.fecha_vencimiento || null;
+        }
+        if (expenseData.recurrente !== undefined) {
+          updateData.recurrente = expenseData.recurrente;
+        }
+
+        const { data, error } = await supabaseAdmin
+          .from("expenses")
+          .update(updateData)
+          .eq("id_gasto", expenseId)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        return createCorsJsonResponse(data, 200);
+      } catch (error: any) {
+        console.error("Error al actualizar gasto:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al actualizar gasto",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+  }
+
+  if (req.method === "DELETE") {
+    // DELETE /expenses/:id - Eliminar gasto
+    if (pathSegments.length === 1) {
+      const expenseId = pathSegments[0];
+
+      try {
+        // Verificar que el gasto existe y pertenece a la empresa
+        const { data: existingExpense } = await supabaseAdmin
+          .from("expenses")
+          .select("id_gasto")
+          .eq("company_id", companyId)
+          .eq("id_gasto", expenseId)
+          .single();
+
+        if (!existingExpense) {
+          return createCorsErrorResponse("Gasto no encontrado", 404);
+        }
+
+        const { error } = await supabaseAdmin
+          .from("expenses")
+          .delete()
+          .eq("id_gasto", expenseId);
+
+        if (error) throw error;
+
+        return createCorsErrorResponse("Gasto eliminado correctamente", 200);
+      } catch (error: any) {
+        console.error("Error al eliminar gasto:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al eliminar gasto",
+            details: error.message,
+          }),
+          {
+            status: 500,
+
+          }
+        );
+      }
+    }
+  }
+
+  // Ruta no encontrada
+  return createCorsErrorResponse("Endpoint no encontrado", 404);
+}
+
+serve(withCors(async (req) => {
+  // Manejar preflight CORS
+  if (req.method === "OPTIONS") {
+    return new Response("ok");
+  }
+
+  try {
+    return await handleSecureRoute(req);
+  } catch (error: any) {
+    console.error("Error en expenses EdgeFunction:", error);
+    return new Response(
+      JSON.stringify({
+        error: "Error interno del servidor",
+        details: error.message,
+      }),
+      {
+        status: 500,
+
+      }
+    );
+  }
+});

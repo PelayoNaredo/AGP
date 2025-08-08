@@ -1,0 +1,438 @@
+// LOGIN CONTROLLER - VERSIÓN NATIVA SIN HONO (UPDATED: FASE 1 CORS)
+import { createClient } from "jsr:@supabase/supabase-js@^2";
+import {
+  requireAuthentication,
+  createErrorResponse,
+  createSuccessResponse,
+  SecureAuthData,
+} from "../_shared/auth-utils.ts";
+// 🔒 FASE 1: Importar nuevo middleware CORS (sin extensión .ts)
+import { 
+  withCors, 
+  createCorsJsonResponse, 
+  createCorsErrorResponse 
+} from "../_shared/cors";
+// Validation functions (sin zod)
+function validateEmail(email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+function validatePassword(password) {
+  if (!password || password.length < 8 || password.length > 72) {
+    return false;
+  }
+  return true;
+}
+function validateStrongPassword(password) {
+  const strongPasswordRegex =
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  return strongPasswordRegex.test(password);
+}
+// Función para sincronizar usuario con tabla users personalizada (DEPRECATED - ya no necesaria)
+// Ya usamos directamente tabla users, no necesitamos sincronización
+// User Login function
+async function loginUser(loginData) {
+  try {
+    const { email, contrasena } = loginData;
+    // Validate input
+    if (!validateEmail(email)) {
+      throw new Error("Email inválido");
+    }
+    if (!validatePassword(contrasena)) {
+      throw new Error("Contraseña debe tener al menos 8 caracteres");
+    }
+    // Use ANON_KEY for authentication, not SERVICE_ROLE_KEY for login
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL"),
+      Deno.env.get("SUPABASE_ANON_KEY")
+    );
+    // Authenticate with Supabase
+    const { data: authData, error: authError } =
+      await supabaseClient.auth.signInWithPassword({
+        email: email,
+        password: contrasena,
+      });
+    if (authError || !authData.user) {
+      throw new Error("Credenciales inválidas");
+    }
+    // Fetch user profile using SERVICE_ROLE_KEY to bypass RLS
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL"),
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+    );
+    let { data: userData, error: userError } = await supabaseAdmin
+      .from("users")
+      .select("*")
+      .eq("id", authData.user.id)
+      .single();
+    // Si no existe el user, NO crear automáticamente con hardcoded company_id
+    if (userError && userError.code === "PGRST116") {
+      console.log(`❌ User not found in users table: ${authData.user.id}`);
+      console.log(`🔧 User exists in auth.users but missing in public.users`);
+      console.log(
+        `🚨 This requires admin intervention - cannot auto-create with unknown company`
+      );
+
+      throw new Error(
+        "Usuario no configurado correctamente. Contacta al administrador."
+      );
+    } else if (userError) {
+      throw new Error("Perfil de usuario no encontrado");
+    }
+    // Sincronizar con tabla users personalizada (ya no necesario, usamos directamente users)
+    // await syncUserWithCustomTable(supabaseAdmin, userData);
+    // Check user account status
+    if (!userData.is_active) {
+      throw new Error("Cuenta de usuario desactivada");
+    }
+    // Create simple JWT-like payload (usando btoa para simplificar)
+    const payload = {
+      id_usuario: userData.id,
+      email: userData.email,
+      nombre: userData.nombre,
+      company_id: userData.company_id,
+      rol: userData.rol,
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 72 * 60 * 60,
+    };
+    // Create simple token (not cryptographically secure, but functional for dev)
+    const token = btoa(JSON.stringify(payload));
+    return {
+      token: token,
+      user: {
+        id: userData.id,
+        email: userData.email,
+        nombre: userData.nombre,
+        rol: userData.rol,
+        company_id: userData.company_id,
+      },
+      supabase_session: {
+        access_token: authData.session?.access_token,
+        refresh_token: authData.session?.refresh_token,
+        expires_at: authData.session?.expires_at,
+      },
+    };
+  } catch (error) {
+    console.error("Login Error:", error);
+    throw error;
+  }
+}
+// Password Reset Request function
+async function requestPasswordReset(email) {
+  try {
+    // Validate input
+    if (!validateEmail(email)) {
+      throw new Error("Email inválido");
+    }
+    // Use ANON_KEY for public password reset endpoint
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL"),
+      Deno.env.get("SUPABASE_ANON_KEY")
+    );
+    // Check if user exists using admin client
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL"),
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+    );
+    const { data: userData, error: userError } = await supabaseAdmin
+      .from("users")
+      .select("id, email")
+      .eq("email", email)
+      .single();
+    if (userError || !userData) {
+      throw new Error("Usuario no encontrado");
+    }
+    // Send password reset email using ANON client
+    const { error: resetError } =
+      await supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: `${Deno.env.get("FRONTEND_URL") || "http://localhost:3000"}/reset-password`,
+      });
+    if (resetError) {
+      throw new Error("Error al enviar correo de restablecimiento");
+    }
+    return {
+      message: "Correo de restablecimiento de contraseña enviado",
+      email: email,
+    };
+  } catch (error) {
+    console.error("Password Reset Request Error:", error);
+    throw error;
+  }
+}
+// Change Password function
+async function changePassword(userId, passwords) {
+  try {
+    const { current_password, new_password } = passwords;
+    // Validate input
+    if (!current_password) {
+      throw new Error("Contraseña actual requerida");
+    }
+    if (!validatePassword(new_password)) {
+      throw new Error("Nueva contraseña debe tener al menos 8 caracteres");
+    }
+    if (!validateStrongPassword(new_password)) {
+      throw new Error(
+        "Nueva contraseña debe contener mayúsculas, minúsculas, números y caracteres especiales"
+      );
+    }
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL"),
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+    );
+    // Get user data
+    const { data: userData, error: getUserError } =
+      await supabaseAdmin.auth.admin.getUserById(userId);
+    if (getUserError || !userData.user?.email) {
+      throw new Error("Usuario no encontrado");
+    }
+    // Verify current password by attempting to sign in
+    const { data: authData, error: authError } =
+      await supabaseAdmin.auth.signInWithPassword({
+        email: userData.user.email,
+        password: current_password,
+      });
+    if (authError) {
+      throw new Error("Contraseña actual incorrecta");
+    }
+    // Update password
+    const { error: updateError } =
+      await supabaseAdmin.auth.admin.updateUserById(userId, {
+        password: new_password,
+      });
+    if (updateError) {
+      throw new Error("Error al actualizar la contraseña");
+    }
+    return {
+      message: "Contraseña actualizada exitosamente",
+    };
+  } catch (error) {
+    console.error("Change Password Error:", error);
+    throw error;
+  }
+}
+// Get user ID from authorization header
+async function extractUserId(request) {
+  try {
+    const authHeader = request.headers.get("Authorization");
+    if (!authHeader) {
+      console.log("❌ No Authorization header found");
+      return null;
+    }
+
+    console.log("🔍 Processing authorization header...");
+
+    // Si es un custom token (base64)
+    if (!authHeader.includes(".")) {
+      try {
+        const token = authHeader.replace("Bearer ", "");
+        const payload = JSON.parse(atob(token));
+        console.log("✅ Custom token validated, user ID:", payload.id_usuario);
+        return payload.id_usuario;
+      } catch {
+        console.log("⚠️ Failed to parse custom token, trying Supabase JWT...");
+      }
+    }
+
+    // Handle Supabase JWT token - usar SERVICE_ROLE para validación completa
+    const token = authHeader.replace("Bearer ", "");
+
+    // Primero intentar con ANON_KEY (más seguro)
+    try {
+      const supabaseClient = createClient(
+        Deno.env.get("SUPABASE_URL"),
+        Deno.env.get("SUPABASE_ANON_KEY")
+      );
+
+      const {
+        data: { user },
+        error: userError,
+      } = await supabaseClient.auth.getUser(token);
+
+      if (!userError && user) {
+        console.log("✅ Token validated with ANON_KEY, user ID:", user.id);
+        return user.id;
+      }
+
+      console.log("⚠️ ANON_KEY validation failed, trying SERVICE_ROLE...");
+    } catch (anonError) {
+      console.log("⚠️ ANON_KEY error:", anonError.message);
+    }
+
+    // Fallback: usar SERVICE_ROLE_KEY para casos especiales
+    try {
+      const supabaseAdmin = createClient(
+        Deno.env.get("SUPABASE_URL"),
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+      );
+
+      const {
+        data: { user },
+        error: userError,
+      } = await supabaseAdmin.auth.getUser(token);
+
+      if (!userError && user) {
+        console.log("✅ Token validated with SERVICE_ROLE, user ID:", user.id);
+        return user.id;
+      }
+
+      console.log(
+        "❌ SERVICE_ROLE validation also failed:",
+        userError?.message
+      );
+    } catch (serviceError) {
+      console.log("❌ SERVICE_ROLE error:", serviceError.message);
+    }
+
+    return null;
+  } catch (error) {
+    console.error("❌ Error extracting user ID:", error);
+    return null;
+  }
+}
+// 🔒 FASE 1: Main handler con CORS middleware integrado
+Deno.serve(withCors(async (req) => {
+  const url = new URL(req.url);
+  const method = req.method;
+  // Handle different path scenarios
+  let pathname = url.pathname;
+  // Remove function prefix if present
+  if (pathname.startsWith("/functions/v1/login")) {
+    pathname = pathname.replace("/functions/v1/login", "");
+  }
+  // Handle direct function calls
+  if (pathname === "/login") {
+    pathname = "/";
+  } else if (pathname.startsWith("/login/")) {
+    pathname = pathname.replace("/login", "");
+  }
+  // Normalize empty path to root
+  if (pathname === "" || pathname === "/") {
+    pathname = "/";
+  }
+  console.log(`🔍 ${method} ${pathname} (original: ${url.pathname})`);
+  try {
+    // 🚨 CORS headers removidos - ahora manejados por middleware
+    // 🚨 Handle preflight requests - removido, manejado por middleware
+    
+    // Route handling
+    if (method === "GET" && pathname === "/") {
+      // Root endpoint
+      return createCorsJsonResponse({
+        message: "Login Controller is running",
+        timestamp: new Date().toISOString(),
+        debug: {
+          originalPath: url.pathname,
+          processedPath: pathname,
+          method: method,
+        },
+        endpoints: [
+          "GET / - This info",
+          "POST /auth/login - User login",
+          "POST /auth/reset-password - Request password reset",
+          "POST /auth/change-password - Change password (requires auth)",
+          "GET /auth/verify - Verify token",
+        ],
+      });
+    }
+    if (method === "POST" && pathname === "/auth/login") {
+      // User login
+      console.log("🔐 Processing login request...");
+      const body = await req.json();
+      const result = await loginUser(body);
+      console.log("✅ Login successful for user:", result.user.email);
+      return createCorsJsonResponse(result);
+    }
+    if (method === "POST" && pathname === "/auth/reset-password") {
+      // Password reset request
+      console.log("📧 Processing password reset request...");
+      const body = await req.json();
+      const result = await requestPasswordReset(body.email);
+      console.log("✅ Password reset email sent to:", body.email);
+      return createCorsJsonResponse(result);
+    }
+    if (method === "POST" && pathname === "/auth/change-password") {
+      // Change password
+      console.log("🔒 Processing password change...");
+      const userId = await extractUserId(req);
+      if (!userId) {
+        return createCorsErrorResponse("Unauthorized - User ID not found", 401);
+      }
+      const body = await req.json();
+      const result = await changePassword(userId, body);
+      console.log("✅ Password changed for user:", userId);
+      return createCorsJsonResponse(result);
+    }
+    if (method === "GET" && pathname === "/auth/verify") {
+      // Verify token usando auth-utils.ts (MIGRACIÓN CRITICAL)
+      console.log("🔍 Verifying token with new auth-utils system...");
+
+      const authResult = await requireAuthentication(req);
+      if (authResult instanceof Response) {
+        return authResult; // Ya incluye el error de autenticación
+      }
+
+      const authData = authResult as SecureAuthData;
+
+      // ✅ CRITICAL: Establecer company context para RLS
+      try {
+        const supabaseAdmin = createClient(
+          Deno.env.get("SUPABASE_URL"),
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+        );
+
+        await supabaseAdmin.rpc("set_current_company_id", {
+          company_uuid: authData.company_id,
+        });
+
+        console.log("🔧 RLS company context set:", authData.company_id);
+      } catch (rlsError) {
+        console.error("⚠️ Failed to set RLS context:", rlsError.message);
+        // Continuar sin RLS context - mejor que fallar completamente
+      }
+
+      // Get user data con RLS context establecido
+      const supabaseAdmin = createClient(
+        Deno.env.get("SUPABASE_URL"),
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+      );
+
+      const { data: userData, error: userError } = await supabaseAdmin
+        .from("users")
+        .select("id, email, nombre, rol, company_id, is_active")
+        .eq("id", authData.user_id)
+        .single();
+
+      if (userError || !userData || !userData.is_active) {
+        return new Response(
+          JSON.stringify({
+            valid: false,
+            error: "User not found or inactive",
+        return createCorsErrorResponse("Unauthorized", 401);
+      }
+
+      console.log(
+        "✅ Token verified with auth-utils for user:",
+        userData.email
+      );
+      return createCorsJsonResponse({
+        valid: true,
+        user: {
+          id: userData.id,
+          email: userData.email,
+          nombre: userData.nombre,
+          rol: userData.rol,
+          company_id: userData.company_id,
+          },
+        });
+    }
+    // Default 404 for unmatched routes
+    console.log("❌ Route not found:", pathname);
+    return createCorsErrorResponse("Route not found", 404);
+  } catch (error) {
+    console.error("❌ Unhandled error:", error);
+    return createCorsErrorResponse(
+      error instanceof Error ? error.message : "Internal server error",
+      500
+    );
+  }
+}));

@@ -50,9 +50,28 @@ const useAuthLogic = () => {
     }
   };
 
-  // Register con validaciones mejoradas
-  const handleRegister = async (formData) => {
+  // Register con validaciones mejoradas - OPTIMIZADO para nuevo AuthContext
+  const handleRegister = async (
+    email,
+    nombre,
+    password,
+    confirmPassword,
+    companyData
+  ) => {
     clearValidationErrors();
+
+    // Crear objeto formData desde los parámetros
+    const formData = {
+      email,
+      nombre,
+      password,
+      confirmPassword,
+      mode: companyData.mode,
+      companyName: companyData.companyName,
+      companyCode: companyData.companyCode,
+      subscriptionPlan: companyData.subscriptionPlan,
+      invitationCode: companyData.invitationCode,
+    };
 
     // Validar formulario completo
     const validation = validateRegisterForm(formData);
@@ -68,7 +87,10 @@ const useAuthLogic = () => {
     setIsSubmitting(true);
 
     try {
-      console.log("📝 Attempting registration:", formData.email);
+      console.log(
+        "📝 Attempting registration via new AuthContext:",
+        formData.email
+      );
 
       const registrationData = {
         email: formData.email,
@@ -82,23 +104,53 @@ const useAuthLogic = () => {
         registrationData.companyData = {
           companyName: formData.companyName,
           subscriptionPlan: formData.subscriptionPlan || "basic",
-          taxRate: formData.taxRate || 21.0,
-          defaultCurrency: formData.defaultCurrency || "EUR",
+          taxRate: 21.0,
+          defaultCurrency: "EUR",
         };
       } else if (formData.mode === "join") {
         registrationData.invitationCode = formData.invitationCode;
       }
 
+      // Usar el AuthContext refactorizado (ya usa Edge Functions directamente)
       const result = await register(registrationData);
 
-      if (result) {
+      if (result && result.success) {
         showSuccess(
           "¡Registro exitoso!",
           formData.mode === "create"
-            ? "Tu cuenta y empresa han sido creadas correctamente."
-            : "Te has unido a la empresa correctamente."
+            ? "Tu cuenta y empresa han sido creadas correctamente. Iniciando sesión..."
+            : "Te has unido a la empresa correctamente. Iniciando sesión..."
         );
-        return true;
+
+        // 🚀 HACER LOGIN AUTOMÁTICO DESPUÉS DEL REGISTRO EXITOSO
+        console.log("🔄 Attempting automatic login after registration...");
+        try {
+          const loginResult = await login({
+            email: formData.email,
+            contrasena: formData.contrasena,
+          });
+
+          if (loginResult && loginResult.success) {
+            console.log("✅ Automatic login after registration successful");
+            return true;
+          } else {
+            console.log(
+              "⚠️ Automatic login failed, but registration was successful"
+            );
+            showError(
+              "Login automático falló",
+              "El registro fue exitoso, pero el login automático falló. Por favor, inicia sesión manualmente."
+            );
+            return true; // El registro fue exitoso
+          }
+        } catch (loginError) {
+          console.error("❌ Automatic login error:", loginError);
+          showError(
+            "Login automático falló",
+            "El registro fue exitoso, pero el login automático falló. Por favor, inicia sesión manualmente."
+          );
+          return true; // El registro fue exitoso
+        }
       }
 
       return false;

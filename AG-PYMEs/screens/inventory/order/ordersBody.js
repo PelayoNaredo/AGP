@@ -51,10 +51,18 @@ const OrdersBody = forwardRef(({ searchQuery = "" }, ref) => {
             Services.Data.Suppliers.getAll(),
           ]);
 
-        setOrders(ordersData);
-        setOrderDetails(detailsData);
-        setInventory(inventoryData);
-        setSuppliers(suppliersData);
+        // Normalizar datos - extraer arrays de objetos wrapped
+        const normalizeData = (data) => {
+          if (Array.isArray(data)) return data;
+          if (data && Array.isArray(data.data)) return data.data;
+          if (data && Array.isArray(data.items)) return data.items;
+          return [];
+        };
+
+        setOrders(normalizeData(ordersData));
+        setOrderDetails(normalizeData(detailsData));
+        setInventory(normalizeData(inventoryData));
+        setSuppliers(normalizeData(suppliersData));
       } catch (error) {
         showError("Error", "Error cargando datos");
       } finally {
@@ -89,7 +97,16 @@ const OrdersBody = forwardRef(({ searchQuery = "" }, ref) => {
     setIsLoading(true);
     try {
       const ordersData = await Services.Data.Orders.getAll();
-      setOrders(ordersData);
+
+      // Normalizar datos
+      const normalizeData = (data) => {
+        if (Array.isArray(data)) return data;
+        if (data && Array.isArray(data.data)) return data.data;
+        if (data && Array.isArray(data.items)) return data.items;
+        return [];
+      };
+
+      setOrders(normalizeData(ordersData));
     } catch (error) {
       showError("Error", "Error cargando pedidos");
     } finally {

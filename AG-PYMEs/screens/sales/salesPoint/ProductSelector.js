@@ -157,8 +157,19 @@ const ProductSelector = ({ onSelectProduct }) => {
     try {
       // Usar Edge Functions de Supabase en lugar del backend legacy
       const response = await Services.Data.Inventory.getAll();
-      setProducts(response);
-      setFilteredProducts(response);
+
+      // Normalizar datos - extraer arrays de objetos wrapped
+      let productsData = [];
+      if (Array.isArray(response)) {
+        productsData = response;
+      } else if (response && Array.isArray(response.data)) {
+        productsData = response.data;
+      } else if (response && Array.isArray(response.items)) {
+        productsData = response.items;
+      }
+
+      setProducts(productsData);
+      setFilteredProducts(productsData);
     } catch (err) {
       console.error("Error fetching products:", err);
       setError("Error al cargar productos. Por favor, intenta de nuevo.");

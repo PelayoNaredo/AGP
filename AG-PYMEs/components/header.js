@@ -11,7 +11,7 @@ import {
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import Icon from "react-native-vector-icons/Ionicons";
-import { Services } from "../api";
+import { EdgeFunctions } from "../config/supabase"; // 🔄 USAR EDGE FUNCTIONS
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import LogoImage from "./LogoImage";
 import logoImage from "../assets/logo.png";
@@ -32,17 +32,51 @@ const CustomHeader = ({ navigation: navProp, route, options, back }) => {
   const fetchSettings = useCallback(async () => {
     try {
       setIsLoading(true);
-      const settings = await Services.Data.Settings.getById(1);
+      console.log("🔄 [Header] Fetching settings via Edge Functions...");
+
+      // 🚀 USAR EDGE FUNCTIONS para obtener settings
+      const response = await EdgeFunctions.settings.getById(1);
+
+      console.log("📊 [Header] Settings response:", response);
+
+      // ✅ MANEJAR FORMATO ENTERPRISE TEMPLATE
+      let settings;
+      if (response.success && response.data) {
+        // Enterprise format: { success: true, data: {...} }
+        settings = response.data;
+        console.log("✅ [Header] Using Enterprise format settings");
+      } else if (response && !response.success) {
+        // Direct data format
+        settings = response;
+        console.log("✅ [Header] Using direct format settings");
+      } else {
+        console.log("⚠️ [Header] No settings found, using defaults");
+        settings = null;
+      }
 
       if (settings?.nombre_local) {
         setLocalTitle(settings.nombre_local);
+        console.log("🏢 [Header] Local title set to:", settings.nombre_local);
+      } else {
+        setLocalTitle("Mi Negocio");
+        console.log("🏢 [Header] Using default title: Mi Negocio");
       }
 
       if (settings?.logo_local) {
         setLocalLogo(settings.logo_local);
+        console.log("🖼️ [Header] Local logo set");
+      } else {
+        setLocalLogo(null);
+        console.log("🖼️ [Header] No local logo found");
       }
     } catch (error) {
       console.error("[Header] Error en fetchSettings:", error);
+      console.error("[Header] Error details:", {
+        name: error.name,
+        message: error.message,
+      });
+      // 🎯 SIN ERROR - usar defaults siempre
+      console.log("🏢 [Header] Settings failed, using defaults: Mi Negocio");
       setLocalTitle("Mi Negocio");
       setLocalLogo(null);
     } finally {
@@ -52,14 +86,40 @@ const CustomHeader = ({ navigation: navProp, route, options, back }) => {
 
   const fetchPendingAlerts = useCallback(async () => {
     try {
-      // Usar servicio optimizado con cache
-      const alerts = await Services.Data.Alerts.getAll(false); // No forzar refresh
+      console.log("🔄 [Header] Fetching alerts via Edge Functions...");
+
+      // 🚀 USAR EDGE FUNCTIONS para obtener alertas
+      const response = await EdgeFunctions.alerts.getAll();
+
+      console.log("📊 [Header] Alerts response:", response);
+
+      // ✅ MANEJAR FORMATO ENTERPRISE TEMPLATE
+      let alerts;
+      if (response.success && response.data) {
+        // Enterprise format: { success: true, data: [...] }
+        alerts = response.data;
+        console.log("✅ [Header] Using Enterprise format alerts");
+      } else if (Array.isArray(response)) {
+        // Direct array format
+        alerts = response;
+        console.log("✅ [Header] Using direct array format alerts");
+      } else {
+        console.log("⚠️ [Header] No alerts found");
+        alerts = [];
+      }
+
       const pendingCount = alerts.filter(
         (alert) => alert.estado === "pendiente"
       ).length;
+
       setPendingAlertsCount(pendingCount);
+      console.log("🔔 [Header] Pending alerts count:", pendingCount);
     } catch (error) {
       console.error("[Header] Error al obtener alertas:", error);
+      console.error("[Header] Alerts error details:", {
+        name: error.name,
+        message: error.message,
+      });
       setPendingAlertsCount(0);
     }
   }, []);

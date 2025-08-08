@@ -1,0 +1,693 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getUserAndCompanyId } from "../_shared/auth-utils.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+};
+
+// Configuración de Supabase
+const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+
+// Función para validar datos del detalle de orden
+function validateOrderDetailData(data: any, isUpdate = false) {
+  const errors: string[] = [];
+
+  // Validación de ID de pedido (obligatorio en creación)
+  if (!isUpdate && !data.id_pedido) {
+    errors.push("id_pedido es obligatorio");
+  }
+
+  if (data.id_pedido !== undefined && data.id_pedido !== null) {
+    const idPedido = parseInt(data.id_pedido);
+    if (isNaN(idPedido) || idPedido <= 0) {
+      errors.push("ID de pedido debe ser un número entero positivo");
+    }
+  }
+
+  // Validación de ID de producto (obligatorio en creación)
+  if (!isUpdate && !data.id_producto) {
+    errors.push("id_producto es obligatorio");
+  }
+
+  if (data.id_producto !== undefined && data.id_producto !== null) {
+    const idProducto = parseInt(data.id_producto);
+    if (isNaN(idProducto) || idProducto <= 0) {
+      errors.push("ID de producto debe ser un número entero positivo");
+    }
+  }
+
+  // Validación de cantidad (obligatorio en creación)
+  if (!isUpdate && !data.cantidad) {
+    errors.push("cantidad es obligatorio");
+  }
+
+  if (data.cantidad !== undefined && data.cantidad !== null) {
+    const cantidad = parseInt(data.cantidad);
+    if (isNaN(cantidad) || cantidad <= 0) {
+      errors.push("Cantidad debe ser un número entero positivo");
+    }
+  }
+
+  // Validación de precio unitario (obligatorio en creación)
+  if (!isUpdate && data.precio_unitario === undefined) {
+    errors.push("precio_unitario es obligatorio");
+  }
+
+  if (data.precio_unitario !== undefined && data.precio_unitario !== null) {
+    const precioUnitario = parseFloat(data.precio_unitario);
+    if (isNaN(precioUnitario) || precioUnitario < 0) {
+      errors.push("Precio unitario debe ser un número positivo o cero");
+    }
+  }
+
+  return errors;
+}
+
+// Función para actualizar el total de la orden
+async function updateOrderTotal(orderId: string) {
+  try {
+    const { data: details, error: detailsError } = await supabaseAdmin
+      .from("order_details")
+      .select("precio_unitario, cantidad")
+      .eq("id_pedido", orderId);
+
+    if (detailsError) throw detailsError;
+
+    const total =
+      details?.reduce((sum, detail) => {
+        return sum + detail.precio_unitario * detail.cantidad;
+      }, 0) || 0;
+
+    const { error: updateError } = await supabaseAdmin
+      .from("orders")
+      .update({ total, updated_at: new Date().toISOString() })
+      .eq("id_pedido", orderId);
+
+    if (updateError) throw updateError;
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error actualizando total de orden:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleSecureRoute(req: Request) {
+  const url = new URL(req.url);
+  const pathSegments = url.pathname.split("/").filter((segment) => segment);
+  const searchParams = url.searchParams;
+
+  // Autenticación y autorización
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader) {
+    return new Response(
+      JSON.stringify({ error: "Token de autorización requerido" }),
+      {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  }
+
+  const { companyId, error: authError } = await getUserAndCompanyId(
+    authHeader.replace("Bearer ", "")
+  );
+  if (authError || !companyId) {
+    return new Response(
+      JSON.stringify({
+        error: authError || "Company ID no encontrado en el token",
+      }),
+      {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  }
+
+  // Rutas para order-detail
+  if (req.method === "GET") {
+    // GET /order-detail?order=123 - Obtener detalles de una orden específica
+    if (pathSegments.length === 0 && searchParams.has("order")) {
+      const orderId = searchParams.get("order")!;
+
+      try {
+        // Verificar que la orden existe y pertenece a la empresa
+        const { data: orderExists } = await supabaseAdmin
+          .from("orders")
+          .select("id_pedido")
+          .eq("company_id", companyId)
+          .eq("id_pedido", orderId)
+          .single();
+
+        if (!orderExists) {
+          return new Response(
+            JSON.stringify({ error: "Orden no encontrada" }),
+            {
+              status: 404,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        const { data, error } = await supabaseAdmin
+          .from("order_details")
+          .select(
+            `
+            *,
+            inventory:id_producto (
+              nombre_producto,
+              sku,
+              precio_venta,
+              stock_actual
+            )
+          `
+          )
+          .eq("id_pedido", orderId)
+          .order("created_at", { ascending: true });
+
+        if (error) throw error;
+
+        return new Response(JSON.stringify(data), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (error: any) {
+        console.error("Error al obtener detalles de orden:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener detalles de orden",
+            details: error.message,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+
+    // GET /order-detail - Obtener todos los detalles
+    if (pathSegments.length === 0) {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("order_details")
+          .select(
+            `
+            *,
+            orders!inner(company_id),
+            inventory:id_producto (
+              nombre_producto,
+              sku,
+              precio_venta,
+              stock_actual
+            )
+          `
+          )
+          .eq("orders.company_id", companyId)
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        return new Response(JSON.stringify(data), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (error: any) {
+        console.error("Error al obtener detalles:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener detalles",
+            details: error.message,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+
+    // GET /order-detail/:id - Obtener detalle por ID
+    if (pathSegments.length === 1) {
+      const detailId = pathSegments[0];
+
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("order_details")
+          .select(
+            `
+            *,
+            orders!inner(company_id),
+            inventory:id_producto (
+              nombre_producto,
+              sku,
+              precio_venta,
+              stock_actual
+            )
+          `
+          )
+          .eq("orders.company_id", companyId)
+          .eq("id_detalle", detailId)
+          .single();
+
+        if (error) {
+          if (error.code === "PGRST116") {
+            return new Response(
+              JSON.stringify({ error: "Detalle no encontrado" }),
+              {
+                status: 404,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              }
+            );
+          }
+          throw error;
+        }
+
+        return new Response(JSON.stringify(data), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (error: any) {
+        console.error("Error al obtener detalle:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al obtener detalle",
+            details: error.message,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+  }
+
+  if (req.method === "POST") {
+    // POST /order-detail - Crear nuevo detalle
+    if (pathSegments.length === 0) {
+      try {
+        const detailData = await req.json();
+
+        // Validar datos
+        const validationErrors = validateOrderDetailData(detailData);
+        if (validationErrors.length > 0) {
+          return new Response(
+            JSON.stringify({
+              error: "Datos inválidos",
+              details: validationErrors,
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        // Verificar que la orden existe y pertenece a la empresa
+        const { data: existingOrder } = await supabaseAdmin
+          .from("orders")
+          .select("id_pedido, estado")
+          .eq("company_id", companyId)
+          .eq("id_pedido", detailData.id_pedido)
+          .single();
+
+        if (!existingOrder) {
+          return new Response(
+            JSON.stringify({ error: "La orden especificada no existe" }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        if (existingOrder.estado === "entregado") {
+          return new Response(
+            JSON.stringify({
+              error: "No se pueden agregar detalles a una orden entregada",
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        // Verificar que el producto existe y pertenece a la empresa
+        const { data: existingProduct } = await supabaseAdmin
+          .from("inventory")
+          .select("id_producto, stock_actual, nombre_producto")
+          .eq("company_id", companyId)
+          .eq("id_producto", detailData.id_producto)
+          .single();
+
+        if (!existingProduct) {
+          return new Response(
+            JSON.stringify({ error: "El producto especificado no existe" }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        // Verificar que no existe ya un detalle para este producto en esta orden
+        const { data: existingDetail } = await supabaseAdmin
+          .from("order_details")
+          .select("id_detalle")
+          .eq("id_pedido", detailData.id_pedido)
+          .eq("id_producto", detailData.id_producto)
+          .single();
+
+        if (existingDetail) {
+          return new Response(
+            JSON.stringify({
+              error: "Ya existe un detalle para este producto en esta orden",
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        // Calcular subtotal
+        const cantidad = parseInt(detailData.cantidad);
+        const precioUnitario = parseFloat(detailData.precio_unitario);
+        const subtotal = cantidad * precioUnitario;
+
+        // Preparar datos para inserción
+        const insertData = {
+          id_pedido: parseInt(detailData.id_pedido),
+          id_producto: parseInt(detailData.id_producto),
+          cantidad: cantidad,
+          precio_unitario: precioUnitario,
+          subtotal: subtotal,
+          notas: detailData.notas || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        const { data, error } = await supabaseAdmin
+          .from("order_details")
+          .insert(insertData)
+          .select(
+            `
+            *,
+            inventory:id_producto (
+              nombre_producto,
+              sku,
+              precio_venta,
+              stock_actual
+            )
+          `
+          )
+          .single();
+
+        if (error) throw error;
+
+        // Actualizar el total de la orden
+        await updateOrderTotal(detailData.id_pedido);
+
+        return new Response(JSON.stringify(data), {
+          status: 201,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (error: any) {
+        console.error("Error al crear detalle:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al crear detalle",
+            details: error.message,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+  }
+
+  if (req.method === "PUT") {
+    // PUT /order-detail/:id - Actualizar detalle
+    if (pathSegments.length === 1) {
+      const detailId = pathSegments[0];
+
+      try {
+        const detailData = await req.json();
+
+        // Validar datos
+        const validationErrors = validateOrderDetailData(detailData, true);
+        if (validationErrors.length > 0) {
+          return new Response(
+            JSON.stringify({
+              error: "Datos inválidos",
+              details: validationErrors,
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        // Verificar que el detalle existe y la orden pertenece a la empresa
+        const { data: existingDetail } = await supabaseAdmin
+          .from("order_details")
+          .select(
+            `
+            *,
+            orders!inner(company_id, estado)
+          `
+          )
+          .eq("orders.company_id", companyId)
+          .eq("id_detalle", detailId)
+          .single();
+
+        if (!existingDetail) {
+          return new Response(
+            JSON.stringify({ error: "Detalle no encontrado" }),
+            {
+              status: 404,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        if (existingDetail.orders.estado === "entregado") {
+          return new Response(
+            JSON.stringify({
+              error: "No se pueden modificar detalles de una orden entregada",
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        // Verificar producto si se está cambiando
+        if (
+          detailData.id_producto &&
+          detailData.id_producto !== existingDetail.id_producto
+        ) {
+          const { data: existingProduct } = await supabaseAdmin
+            .from("inventory")
+            .select("id_producto")
+            .eq("company_id", companyId)
+            .eq("id_producto", detailData.id_producto)
+            .single();
+
+          if (!existingProduct) {
+            return new Response(
+              JSON.stringify({ error: "El producto especificado no existe" }),
+              {
+                status: 400,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              }
+            );
+          }
+        }
+
+        // Preparar datos para actualización
+        const updateData: any = {
+          updated_at: new Date().toISOString(),
+        };
+
+        if (detailData.cantidad !== undefined) {
+          updateData.cantidad = parseInt(detailData.cantidad);
+        }
+        if (detailData.precio_unitario !== undefined) {
+          updateData.precio_unitario = parseFloat(detailData.precio_unitario);
+        }
+        if (detailData.id_producto !== undefined) {
+          updateData.id_producto = parseInt(detailData.id_producto);
+        }
+        if (detailData.notas !== undefined) {
+          updateData.notas = detailData.notas || null;
+        }
+
+        // Recalcular subtotal si cantidad o precio cambió
+        if (
+          updateData.cantidad !== undefined ||
+          updateData.precio_unitario !== undefined
+        ) {
+          const cantidad = updateData.cantidad || existingDetail.cantidad;
+          const precio =
+            updateData.precio_unitario || existingDetail.precio_unitario;
+          updateData.subtotal = cantidad * precio;
+        }
+
+        const { data, error } = await supabaseAdmin
+          .from("order_details")
+          .update(updateData)
+          .eq("id_detalle", detailId)
+          .select(
+            `
+            *,
+            inventory:id_producto (
+              nombre_producto,
+              sku,
+              precio_venta,
+              stock_actual
+            )
+          `
+          )
+          .single();
+
+        if (error) throw error;
+
+        // Actualizar el total de la orden
+        await updateOrderTotal(existingDetail.id_pedido);
+
+        return new Response(JSON.stringify(data), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (error: any) {
+        console.error("Error al actualizar detalle:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al actualizar detalle",
+            details: error.message,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+  }
+
+  if (req.method === "DELETE") {
+    // DELETE /order-detail/:id - Eliminar detalle
+    if (pathSegments.length === 1) {
+      const detailId = pathSegments[0];
+
+      try {
+        // Verificar que el detalle existe y la orden pertenece a la empresa
+        const { data: existingDetail } = await supabaseAdmin
+          .from("order_details")
+          .select(
+            `
+            *,
+            orders!inner(company_id, estado)
+          `
+          )
+          .eq("orders.company_id", companyId)
+          .eq("id_detalle", detailId)
+          .single();
+
+        if (!existingDetail) {
+          return new Response(
+            JSON.stringify({ error: "Detalle no encontrado" }),
+            {
+              status: 404,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        if (existingDetail.orders.estado === "entregado") {
+          return new Response(
+            JSON.stringify({
+              error: "No se pueden eliminar detalles de una orden entregada",
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        const { error } = await supabaseAdmin
+          .from("order_details")
+          .delete()
+          .eq("id_detalle", detailId);
+
+        if (error) throw error;
+
+        // Actualizar el total de la orden
+        await updateOrderTotal(existingDetail.id_pedido);
+
+        return new Response(
+          JSON.stringify({ message: "Detalle eliminado correctamente" }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      } catch (error: any) {
+        console.error("Error al eliminar detalle:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Error al eliminar detalle",
+            details: error.message,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+  }
+
+  // Ruta no encontrada
+  return new Response(JSON.stringify({ error: "Endpoint no encontrado" }), {
+    status: 404,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+serve(async (req) => {
+  // Manejar preflight CORS
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    return await handleSecureRoute(req);
+  } catch (error: any) {
+    console.error("Error en order-detail EdgeFunction:", error);
+    return new Response(
+      JSON.stringify({
+        error: "Error interno del servidor",
+        details: error.message,
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  }
+});

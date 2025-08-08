@@ -188,44 +188,81 @@ export const GlobalCacheProvider = ({ children, config = {} }) => {
   // Compatibilidad con utils/cacheManager.js
   const getEmployees = useCallback(
     async (forceRefresh = false) => {
-      const { Services } = require("../../api/index"); // Import dinámico
-      return withCache("employees", () => Services.Data.Employees.getAll(), {
-        dataType: "employees",
-        forceRefresh,
-      });
+      try {
+        const { Services } = require("../../api/index"); // Import dinámico
+        return withCache("employees", () => Services.Data.Employees.getAll(), {
+          dataType: "employees",
+          forceRefresh,
+        });
+      } catch (error) {
+        console.warn(
+          "🚨 [CACHE] getEmployees failed, returning empty array:",
+          error.message
+        );
+        return [];
+      }
     },
     [withCache]
   );
 
   const getServices = useCallback(
     async (forceRefresh = false) => {
-      const { Services } = require("../../api/index");
-      return withCache("services", () => Services.Data.Services.getAll(), {
-        dataType: "services",
-        forceRefresh,
-      });
+      try {
+        const { Services } = require("../../api/index");
+        return withCache("services", () => Services.Data.Services.getAll(), {
+          dataType: "services",
+          forceRefresh,
+        });
+      } catch (error) {
+        console.warn(
+          "🚨 [CACHE] getServices failed, returning empty array:",
+          error.message
+        );
+        return [];
+      }
     },
     [withCache]
   );
 
   const getClients = useCallback(
     async (forceRefresh = false) => {
-      const { Services } = require("../../api/index");
-      return withCache("clients", () => Services.Data.Clients.getAll(), {
-        dataType: "clients",
-        forceRefresh,
-      });
+      try {
+        const { Services } = require("../../api/index");
+        return withCache("clients", () => Services.Data.Clients.getAll(), {
+          dataType: "clients",
+          forceRefresh,
+        });
+      } catch (error) {
+        console.warn(
+          "🚨 [CACHE] getClients failed, returning empty array:",
+          error.message
+        );
+        return [];
+      }
     },
     [withCache]
   );
 
   const getSettings = useCallback(
     async (forceRefresh = false) => {
-      const { Services } = require("../../api/index");
-      return withCache("settings", () => Services.Data.Settings.getById(1), {
-        dataType: "settings",
-        forceRefresh,
-      });
+      try {
+        const { Services } = require("../../api/index");
+        return withCache("settings", () => Services.Data.Settings.getById(1), {
+          dataType: "settings",
+          forceRefresh,
+        });
+      } catch (error) {
+        console.warn(
+          "🚨 [CACHE] getSettings failed, returning default settings:",
+          error.message
+        );
+        return {
+          id: 1,
+          nombre_empresa: "Empresa",
+          timezone: "America/Mexico_City",
+          // Configuraciones por defecto
+        };
+      }
     },
     [withCache]
   );
@@ -233,44 +270,60 @@ export const GlobalCacheProvider = ({ children, config = {} }) => {
   // Compatibilidad con context/PlannerCacheBulk.js
   const getAppointmentsMonthly = useCallback(
     async (date, forceRefresh = false) => {
-      const { Services } = require("../../api/index");
-      const monthKey = getMonthKey(date);
-      const { startDate, endDate } = getMonthRange(date);
+      try {
+        const { Services } = require("../../api/index");
+        const monthKey = getMonthKey(date);
+        const { startDate, endDate } = getMonthRange(date);
 
-      return withCache(
-        `appointments_monthly_${monthKey}`,
-        () => Services.Data.Appointments.getByDateRange(startDate, endDate),
-        {
-          dataType: "appointments",
-          strategy: "bulk",
-          bulkLoading: true,
-          dateRange: { month: monthKey },
-          forceRefresh,
-        }
-      );
+        return withCache(
+          `appointments_monthly_${monthKey}`,
+          () => Services.Data.Appointments.getByDateRange(startDate, endDate),
+          {
+            dataType: "appointments",
+            strategy: "bulk",
+            bulkLoading: true,
+            dateRange: { month: monthKey },
+            forceRefresh,
+          }
+        );
+      } catch (error) {
+        console.warn(
+          "🚨 [CACHE] getAppointmentsMonthly failed, returning empty array:",
+          error.message
+        );
+        return [];
+      }
     },
     [withCache]
   );
 
   const getShiftsMonthly = useCallback(
     async (date, forceRefresh = false) => {
-      const { Services } = require("../../api/index");
-      const dateObj = new Date(date);
-      const year = dateObj.getFullYear();
-      const month = dateObj.getMonth() + 1;
-      const monthKey = getMonthKey(date);
+      try {
+        const { Services } = require("../../api/index");
+        const dateObj = new Date(date);
+        const year = dateObj.getFullYear();
+        const month = dateObj.getMonth() + 1;
+        const monthKey = getMonthKey(date);
 
-      return withCache(
-        `shifts_monthly_${monthKey}`,
-        () => Services.Data.Shifts.getByMonth(year, month),
-        {
-          dataType: "shifts",
-          strategy: "bulk",
-          bulkLoading: true,
-          dateRange: { month: monthKey },
-          forceRefresh,
-        }
-      );
+        return withCache(
+          `shifts_monthly_${monthKey}`,
+          () => Services.Data.Shifts.getByMonth(year, month),
+          {
+            dataType: "shifts",
+            strategy: "bulk",
+            bulkLoading: true,
+            dateRange: { month: monthKey },
+            forceRefresh,
+          }
+        );
+      } catch (error) {
+        console.warn(
+          "🚨 [CACHE] getShiftsMonthly failed, returning empty array:",
+          error.message
+        );
+        return [];
+      }
     },
     [withCache]
   );

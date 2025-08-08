@@ -143,8 +143,20 @@ const IncomePage = forwardRef(
           return;
         }
 
+        // Obtener los datos del array - manejar tanto formato directo como wrapped
+        let items = [];
+        if (Array.isArray(response)) {
+          items = response;
+        } else if (response.data && Array.isArray(response.data)) {
+          items = response.data;
+        } else if (response.items && Array.isArray(response.items)) {
+          items = response.items;
+        } else {
+          console.warn("[Ingresos] Formato de respuesta inesperado:", response);
+          items = [];
+        }
+
         // Filtrar por mes seleccionado
-        const items = response.items || response || [];
         const filteredItems = items.filter((item) => {
           const date = new Date(item.fecha_ingreso);
           return (
